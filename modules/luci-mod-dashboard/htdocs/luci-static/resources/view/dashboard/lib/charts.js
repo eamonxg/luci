@@ -62,7 +62,7 @@ return baseclass.extend({
 	renderStatCard(opts) {
 		return E('div', { 'class': 'dash-card dash-stat dash-span-1' }, [
 			E('div', { 'style': 'display:flex;justify-content:space-between;align-items:flex-start' }, [
-				E('span', { 'class': 'dash-stat-label' }, [ opts.label ]),
+				E('span', { 'class': 'dash-stat-label' }, [ opts.label || '' ]),
 				E('span', { 'class': 'dash-stat-icon' }, [ opts.icon || '' ])
 			]),
 			E('div', { 'class': 'dash-stat-num' }, [ opts.value ]),
@@ -84,7 +84,7 @@ return baseclass.extend({
 				transform: 'rotate(-90 40 40)'
 			}));
 		});
-		circles.push(svgEl('text', { x: 40, y: 45, 'text-anchor': 'middle', 'font-size': 15, 'font-weight': 700, fill: 'var(--dash-text)' }, [ document.createTextNode(String(centerText)) ]));
+		circles.push(svgEl('text', { x: 40, y: 45, 'text-anchor': 'middle', 'font-size': 15, 'font-weight': 700, fill: 'var(--dash-text)' }, [ document.createTextNode(String(centerText != null ? centerText : '')) ]));
 		const svg = svgEl('svg', { viewBox: '0 0 80 80', width: 80, height: 80, style: 'flex-shrink:0' }, circles);
 		const legend = E('div', { 'class': 'dash-legend' }, data.map(d =>
 			E('div', { 'class': 'dash-legend-row' }, [
@@ -109,8 +109,8 @@ return baseclass.extend({
 		return E('div', {}, [
 			E('div', { 'style': 'display:flex;justify-content:space-between;align-items:center;margin-bottom:0.6rem' }, [
 				E('div', {}, [
-					E('div', { 'class': 'dash-card-title' }, [ opts.title ]),
-					E('div', { 'class': 'dash-card-desc' }, [ opts.desc ])
+					E('div', { 'class': 'dash-card-title' }, [ opts.title || '' ]),
+					E('div', { 'class': 'dash-card-desc' }, [ opts.desc || '' ])
 				]),
 				legend
 			]),
@@ -120,8 +120,9 @@ return baseclass.extend({
 
 	// horizontal signal bar row: label + bar (percent) + right text
 	renderSignalRow(label, percent, rightText) {
-		const cls = signalQualityClass(percent);
-		const w = Math.max(0, Math.min(100, percent));
+		const p = isFinite(percent) ? percent : 0;
+		const cls = signalQualityClass(p);
+		const w = Math.max(0, Math.min(100, p));
 		return E('div', { 'style': 'display:flex;align-items:center;gap:0.5rem;font-size:0.72rem;margin:0.25rem 0' }, [
 			E('span', { 'style': 'width:5rem;flex-shrink:0;color:var(--dash-text-muted)' }, [ label ]),
 			E('div', { 'class': 'dash-sigbar' }, [ E('i', { 'class': cls, 'style': 'width:' + w + '%' }) ]),
