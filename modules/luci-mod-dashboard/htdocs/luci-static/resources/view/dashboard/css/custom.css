@@ -5,7 +5,6 @@
 .Dashboard {
 	/* Surface + text: map to LuCI generic theme vars first, then safe fallbacks.
 	   No !important, so third-party themes can still override. */
-	--dash-page-bg:     var(--background-color-low, transparent);
 	--dash-card-bg:     var(--background-color-high, #ffffff);
 	--dash-card-border: var(--border-color-medium, #e5e7eb);
 	--dash-divider:     var(--border-color-medium, #eef0f2);
@@ -60,8 +59,8 @@
 	display: inline-flex; align-items: center; gap: 0.25rem;
 	padding: 0.1rem 0.5rem; border-radius: 999px; font-size: 0.7rem; font-weight: 500;
 }
-.Dashboard .dash-badge.green { background: color-mix(in srgb, var(--dash-c-green) 15%, transparent); color: var(--dash-c-green); }
-.Dashboard .dash-badge.red   { background: color-mix(in srgb, var(--dash-c-red) 15%, transparent);   color: var(--dash-c-red); }
+.Dashboard .dash-badge-green { background: color-mix(in srgb, var(--dash-c-green) 15%, transparent); color: var(--dash-c-green); }
+.Dashboard .dash-badge-red   { background: color-mix(in srgb, var(--dash-c-red) 15%, transparent);   color: var(--dash-c-red); }
 
 /* ---- Table ---- */
 .Dashboard .dash-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
