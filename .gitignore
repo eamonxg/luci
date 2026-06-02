@@ -19,3 +19,4 @@ docs/jsapi/*
 !docs/jsapi/README.md
 **eslint.config**
 !eslint.config.mjs
+.superpowers/
