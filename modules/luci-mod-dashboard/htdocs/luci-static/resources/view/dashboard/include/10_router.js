@@ -315,7 +315,6 @@ return baseclass.extend({
 	},
 
 	render(data) {
-		this._lastData = data;
 		return [ this.renderInternetBox(data), this.renderRouterBox(data) ];
 	}
 });
