@@ -39,6 +39,7 @@ test('sparklinePath produces a path starting at x=0 and ending at x=width', () =
 test('sparklinePath with single point is a flat line', () => {
 	const d = pure.sparklinePath([42], 'up', 300, 100, 30);
 	assert.ok(d.startsWith('M0,'), d);
+	assert.ok(d.includes('L300,'), 'single point extends a flat line to width: ' + d);
 });
 
 // signalQualityClass: maps percent → low/mid/high
@@ -46,6 +47,8 @@ test('signalQualityClass thresholds', () => {
 	assert.strictEqual(pure.signalQualityClass(10), 'low');
 	assert.strictEqual(pure.signalQualityClass(40), 'mid');
 	assert.strictEqual(pure.signalQualityClass(80), 'high');
+	assert.strictEqual(pure.signalQualityClass(25), 'mid');
+	assert.strictEqual(pure.signalQualityClass(50), 'high');
 });
 
 console.log(`\n${passed} tests passed`);
