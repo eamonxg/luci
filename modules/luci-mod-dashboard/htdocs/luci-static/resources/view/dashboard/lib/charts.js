@@ -44,3 +44,88 @@ function signalQualityClass(percent) {
 	return 'high';
 }
 // </pure>
+
+function svgEl(tag, attrs, children) {
+	const ns = 'http://www.w3.org/2000/svg';
+	const el = document.createElementNS(ns, tag);
+	for (const k in (attrs || {})) el.setAttribute(k, attrs[k]);
+	(children || []).forEach(c => { if (c != null) el.appendChild(c); });
+	return el;
+}
+
+return baseclass.extend({
+	donutSegments: donutSegments,
+	sparklinePath: sparklinePath,
+	signalQualityClass: signalQualityClass,
+
+	// stat card: { label, value (string|Node), icon (emoji), desc }
+	renderStatCard(opts) {
+		return E('div', { 'class': 'dash-card dash-stat dash-span-1' }, [
+			E('div', { 'style': 'display:flex;justify-content:space-between;align-items:flex-start' }, [
+				E('span', { 'class': 'dash-stat-label' }, [ opts.label ]),
+				E('span', { 'class': 'dash-stat-icon' }, [ opts.icon || '' ])
+			]),
+			E('div', { 'class': 'dash-stat-num' }, [ opts.value ]),
+			E('div', { 'class': 'dash-stat-label' }, [ opts.desc || '' ])
+		]);
+	},
+
+	// donut: data = [{ label, value, color }]
+	renderDonut(data, centerText) {
+		const C = 2 * Math.PI * 28; // r=28
+		const segs = donutSegments(data.map(d => d.value), C);
+		const circles = [ svgEl('circle', { cx: 40, cy: 40, r: 28, fill: 'none', stroke: 'var(--dash-divider)', 'stroke-width': 12 }) ];
+		segs.forEach((s, i) => {
+			if (s.len <= 0) return;
+			circles.push(svgEl('circle', {
+				cx: 40, cy: 40, r: 28, fill: 'none', stroke: data[i].color, 'stroke-width': 12,
+				'stroke-dasharray': s.len.toFixed(3) + ' ' + (C - s.len).toFixed(3),
+				'stroke-dashoffset': s.dashoffset.toFixed(3),
+				transform: 'rotate(-90 40 40)'
+			}));
+		});
+		circles.push(svgEl('text', { x: 40, y: 45, 'text-anchor': 'middle', 'font-size': 15, 'font-weight': 700, fill: 'var(--dash-text)' }, [ document.createTextNode(String(centerText)) ]));
+		const svg = svgEl('svg', { viewBox: '0 0 80 80', width: 80, height: 80, style: 'flex-shrink:0' }, circles);
+		const legend = E('div', { 'class': 'dash-legend' }, data.map(d =>
+			E('div', { 'class': 'dash-legend-row' }, [
+				E('span', { 'class': 'dash-legend-dot', 'style': 'background:' + d.color }),
+				E('span', {}, [ d.label + ' ' + d.value ])
+			])
+		));
+		return E('div', { 'style': 'display:flex;align-items:center;gap:1rem' }, [ svg, legend ]);
+	},
+
+	// line chart: series = [{ key, color, label }], samples = [{up, down}, ...]
+	renderLineChart(samples, series, opts) {
+		const W = 520, H = 100, P = 8;
+		const grid = [25, 50, 75].map(y => svgEl('line', { x1: 0, y1: y, x2: W, y2: y, stroke: 'var(--dash-divider)', 'stroke-width': 1 }));
+		const paths = series.map(s => svgEl('path', {
+			d: sparklinePath(samples, s.key, W, H, P), fill: 'none', stroke: s.color, 'stroke-width': 1.5
+		}));
+		const svg = svgEl('svg', { viewBox: '0 0 ' + W + ' ' + H, preserveAspectRatio: 'none', style: 'width:100%;height:90px;display:block' }, grid.concat(paths));
+		const legend = E('div', { 'style': 'display:flex;gap:0.9rem;font-size:0.72rem' }, series.map(s =>
+			E('span', { 'style': 'color:' + s.color }, [ s.label ])
+		));
+		return E('div', {}, [
+			E('div', { 'style': 'display:flex;justify-content:space-between;align-items:center;margin-bottom:0.6rem' }, [
+				E('div', {}, [
+					E('div', { 'class': 'dash-card-title' }, [ opts.title ]),
+					E('div', { 'class': 'dash-card-desc' }, [ opts.desc ])
+				]),
+				legend
+			]),
+			svg
+		]);
+	},
+
+	// horizontal signal bar row: label + bar (percent) + right text
+	renderSignalRow(label, percent, rightText) {
+		const cls = signalQualityClass(percent);
+		const w = Math.max(0, Math.min(100, percent));
+		return E('div', { 'style': 'display:flex;align-items:center;gap:0.5rem;font-size:0.72rem;margin:0.25rem 0' }, [
+			E('span', { 'style': 'width:5rem;flex-shrink:0;color:var(--dash-text-muted)' }, [ label ]),
+			E('div', { 'class': 'dash-sigbar' }, [ E('i', { 'class': cls, 'style': 'width:' + w + '%' }) ]),
+			E('span', { 'style': 'width:3.2rem;text-align:right;color:var(--dash-text-muted)' }, [ rightText ])
+		]);
+	}
+});
