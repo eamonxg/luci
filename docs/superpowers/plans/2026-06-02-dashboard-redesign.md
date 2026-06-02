@@ -348,7 +348,7 @@ function signalQualityClass(percent) {
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `cd htdocs/luci-static/resources/view/dashboard/lib && node charts.test.mjs`
-Expected: PASS — `7 tests passed`.
+Expected: PASS — `5 tests passed`.
 
 - [ ] **Step 5: Commit**
 
@@ -460,7 +460,7 @@ return baseclass.extend({
 - [ ] **Step 2: Confirm the test still passes (wrapper didn't break the pure block)**
 
 Run: `cd htdocs/luci-static/resources/view/dashboard/lib && node charts.test.mjs`
-Expected: PASS — `7 tests passed` (the shim only evals the `// <pure>` block, so the `return baseclass.extend(...)` is ignored).
+Expected: PASS — `5 tests passed` (the shim only evals the `// <pure>` block, so the `return baseclass.extend(...)` is ignored).
 
 - [ ] **Step 3: Manual smoke check of module shape**
 
@@ -1069,7 +1069,7 @@ Then run the message-extraction sanity (if available): `grep -rn "_('" htdocs/lu
 - [ ] **Step 5: Run the chart unit tests once more**
 
 Run: `cd htdocs/luci-static/resources/view/dashboard/lib && node charts.test.mjs`
-Expected: PASS — `7 tests passed`.
+Expected: PASS — `5 tests passed`.
 
 - [ ] **Step 6: Final commit (only if fix-ups were made)**
 
