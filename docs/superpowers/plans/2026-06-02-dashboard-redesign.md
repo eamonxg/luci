@@ -524,7 +524,7 @@ sampleWanBytes(wanNetworks) {
 Replace the whole `renderHtml(data, type)` method body so that:
 - The wrapper uses `dash-card dash-span-2` instead of `dashboard-bg box-s1`.
 - Title row uses the existing icon `<img>` (keep `svgmonotone` class + icon-switch logic) plus `<h3>`.
-- Rows use `.dash-row` / `.dash-key` / `.dash-val`; connected status uses `.dash-badge green|red`.
+- Rows use `.dash-row` / `.dash-key` / `.dash-val`; connected status uses `.dash-badge dash-badge-green|dash-badge-red`.
 - Section labels (`IPv4`/`IPv6`) use `.dash-section-label`.
 - The colon separator is appended via `E('span',{},[title])` + value span (NOT a hardcoded `：` inside the string — drop the full-width colon; the flex layout provides separation).
 
@@ -566,7 +566,7 @@ renderHtml(data, type) {
 				let cls = '';
 				let val = field.value;
 				if (ver === 'connected') {
-					cls = field.value ? 'dash-badge green' : 'dash-badge red';
+					cls = field.value ? 'dash-badge dash-badge-green' : 'dash-badge dash-badge-red';
 					val = field.value ? _('yes') : _('no');
 				}
 				if ((ver === 'addrsv4' || ver === 'dnsv4' || ver === 'dnsv6' || ver === 'addrsv6') && Array.isArray(val))
@@ -608,7 +608,7 @@ renderSummary(data) {
 	const stats = [
 		charts.renderStatCard({
 			label: _('Internet'), icon: '🌐',
-			value: E('span', { 'class': connected ? 'dash-badge green' : 'dash-badge red' }, [ connected ? _('Connected') : _('Disconnected') ]),
+			value: E('span', { 'class': connected ? 'dash-badge dash-badge-green' : 'dash-badge dash-badge-red' }, [ connected ? _('Connected') : _('Disconnected') ]),
 			desc: (this.params.internet && this.params.internet.v4.protocol.value) || ''
 		}),
 		charts.renderStatCard({
@@ -766,7 +766,7 @@ renderHtml() {
 		const active = radio.isactive ? radio.isactive.value : false;
 		box.appendChild(E('div', { 'class': 'dash-section-label', 'style': 'display:flex;justify-content:space-between;align-items:center' }, [
 			E('span', {}, [ ssid ]),
-			E('span', { 'class': (active === _('yes') || active === true) ? 'dash-badge green' : 'dash-badge red' }, [ active === true ? _('yes') : active ])
+			E('span', { 'class': (active === _('yes') || active === true) ? 'dash-badge dash-badge-green' : 'dash-badge dash-badge-red' }, [ active === true ? _('yes') : active ])
 		]));
 		['chan', 'rate', 'bssid', 'encryption', 'associations'].forEach(k => {
 			if (radio[k] && radio[k].visible)
