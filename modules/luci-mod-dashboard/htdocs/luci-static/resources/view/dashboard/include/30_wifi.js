@@ -43,10 +43,10 @@ return baseclass.extend({
 		// Per-radio info as key/value rows
 		this.params.wifi.radios.forEach(radio => {
 			const ssid = radio.ssid ? radio.ssid.value : '?';
-			const active = radio.isactive ? radio.isactive.value : false;
+			const on = (radio.isactive ? radio.isactive.value : false) === true;
 			box.appendChild(E('div', { 'class': 'dash-section-label', 'style': 'display:flex;justify-content:space-between;align-items:center' }, [
 				E('span', {}, [ ssid ]),
-				E('span', { 'class': (active === _('yes') || active === true) ? 'dash-badge dash-badge-green' : 'dash-badge dash-badge-red' }, [ active === true ? _('yes') : active ])
+				E('span', { 'class': on ? 'dash-badge dash-badge-green' : 'dash-badge dash-badge-red' }, [ on ? _('yes') : _('no') ])
 			]));
 			['chan', 'rate', 'bssid', 'encryption', 'associations'].forEach(k => {
 				if (radio[k] && radio[k].visible)
@@ -71,7 +71,7 @@ return baseclass.extend({
 			this.params.wifi.devices.forEach(dev => {
 				body.appendChild(E('tr', {}, [
 					E('td', { 'data-label': _('Hostname') }, [ dev.hostname.value || '?' ]),
-					E('td', { 'data-label': _('SSID') }, [ dev.ssid.value ]),
+					E('td', { 'data-label': _('SSID') }, [ dev.ssid.value || '?' ]),
 					E('td', { 'data-label': _('Up.') }, [ dev.transferred.value.tx ]),
 					E('td', { 'data-label': _('Down.') }, [ dev.transferred.value.rx ])
 				]));
@@ -97,7 +97,7 @@ return baseclass.extend({
 			stats: [ charts.renderStatCard({
 				label: _('WiFi Networks'), icon: '📶',
 				value: String(radios.length),
-				desc: _('Active radios')
+				desc: _('Wireless networks')
 			}) ],
 			macs: macs
 		};
