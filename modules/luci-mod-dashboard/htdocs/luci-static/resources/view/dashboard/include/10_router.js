@@ -4,6 +4,7 @@
 'require rpc';
 'require network';
 'require uci';
+'require view.dashboard.lib.charts as charts';
 
 var callSystemBoard = rpc.declare({
 	object: 'system',
@@ -36,139 +37,71 @@ return baseclass.extend({
 		]);
 	},
 
-	renderRow(title, value, className = '', tag = 'p') {
-		return E(tag, { 'class': 'mt-2' }, [
-			E('span', {}, [ title + '：' ]),
-			E('span', { 'class': className }, [ value ])
+	// Sample WAN device byte counters from the lowest-metric WANv4 interface.
+	sampleWanBytes(wanNetworks) {
+		let min_metric = 2000000000, ifc = null;
+		for (let i = 0; i < wanNetworks.length; i++) {
+			const m = wanNetworks[i].getMetric();
+			if (m < min_metric) { min_metric = m; ifc = wanNetworks[i]; }
+		}
+		if (!ifc) return null;
+		const dev = ifc.getL3Device && ifc.getL3Device();
+		if (!dev) return null;
+		return { rx: dev.getRXBytes() || 0, tx: dev.getTXBytes() || 0, t: Date.now() };
+	},
+
+	renderRow(title, value, badgeClass) {
+		return E('div', { 'class': 'dash-row' }, [
+			E('span', { 'class': 'dash-key' }, [ title ]),
+			E('span', { 'class': badgeClass ? ('dash-val ' + badgeClass) : 'dash-val' }, [ value ])
 		]);
 	},
 
-	renderArrayAsTable(title, values) {
-		const table = E('table', { 'class': 'table' });
-
-		if (Array.isArray(values) && values.length > 0) {
-			values.forEach((val) => {
-				table.appendChild(E('tr', {}, [
-					E('td', {}, [ title + '：' ]),
-					E('td', {}, [ val ])
-				]));
-			});
-		} else {
-			table.appendChild(E('tr', {}, [
-				E('td', {}, [ title + '：' ]),
-				E('td', {}, [ '-' ])
-			]));
-		}
-
-		return table;
-	},
-
 	renderHtml(data, type) {
-
 		let icon = type;
-		const title = 'router' == type ? _('System') : _('Internet');
-		const container_wapper = E('div', { 'class': type + '-status-self dashboard-bg box-s1'});
-		const container_box = E('div', { 'class': type + '-status-info'});
-		const container_item = E('div', { 'class': 'settings-info'});
+		const title = ('router' == type) ? _('System') : _('Internet');
+		const card = E('div', { 'class': type + '-status-self dash-card dash-span-2' });
+		const box  = E('div', { 'class': type + '-status-info' });
 
-		if ('internet' == type) {
+		if ('internet' == type)
 			icon = (data.v4.connected.value || data.v6.connected.value) ? type : 'not-internet';
-		}
 
-		container_box.appendChild(E('div', { 'class': 'title'}, [
+		box.appendChild(E('div', { 'class': 'title', 'style': 'display:flex;align-items:center;gap:0.6rem' }, [
 			E('img', {
 				'src': L.resource('view/dashboard/icons/' + icon + '.svg'),
-				'width': 'router' == type ? 64 : 54,
+				'width': ('router' == type) ? 40 : 36,
 				'title': title,
 				'class': (type == 'router' || icon == 'not-internet') ? 'middle svgmonotone' : 'middle'
 			}),
-			E('h3', title)
+			E('h3', { 'class': 'dash-card-title', 'style': 'margin:0' }, [ title ])
 		]));
-
-		container_box.appendChild(E('hr'));
+		box.appendChild(E('hr', { 'class': 'dash-divider' }));
 
 		if ('internet' == type) {
-			const container_internet_v4 = E('div');
-			const container_internet_v6 = E('div');
-
-			for(let idx in data) {
-
-				for(let ver in data[idx]) {
-					let classname = ver;
-					const visible = data[idx][ver].visible;
-
-					if('connected' === ver) {
-						classname = data[idx][ver].value ? 'label label-success' : 'label label-danger';
-						data[idx][ver].value = data[idx][ver].value ? _('yes') : _('no');
+			['v4', 'v6'].forEach(idx => {
+				box.appendChild(E('div', { 'class': 'dash-section-label' }, [ data[idx].title ]));
+				for (const ver in data[idx]) {
+					if (ver === 'title') continue;
+					const field = data[idx][ver];
+					if (!field.visible) continue;
+					let cls = '';
+					let val = field.value;
+					if (ver === 'connected') {
+						cls = field.value ? 'dash-badge dash-badge-green' : 'dash-badge dash-badge-red';
+						val = field.value ? _('yes') : _('no');
 					}
-
-					if ('v4' === idx) {
-
-						if ('title' === ver) {
-							container_internet_v4.appendChild(
-								E('p', { 'class': 'mt-2'}, [
-									E('span', {'class': ''}, [ data[idx].title ]),
-								])
-							);
-							continue;
-						}
-
-						if ('addrsv4' === ver) {
-							const addrs = data[idx][ver].value;
-							if(Array.isArray(addrs) && addrs.length) {
-								for(let ip in addrs) {
-									data[idx][ver].value = addrs[ip].split('/')[0];
-								}
-							}
-						}
-
-						if (visible) {
-							if (['dnsv4'].includes(ver) && Array.isArray(data[idx][ver].value)) {
-								container_internet_v4.appendChild(this.renderArrayAsTable(data[idx][ver].title, data[idx][ver].value));
-							} else {
-								container_internet_v4.appendChild(this.renderRow(data[idx][ver].title, data[idx][ver].value, classname));
-							}
-						}
-
-					} else {
-
-						if ('title' === ver) {
-							container_internet_v6.appendChild(
-								E('p', { 'class': 'mt-2'}, [
-									E('span', {'class': ''}, [ data[idx].title ]),
-								])
-							);
-							continue;
-						}
-
-						if (visible) {
-							if (['dnsv6'].includes(ver) && Array.isArray(data[idx][ver].value)) {
-								container_internet_v6.appendChild(this.renderArrayAsTable(data[idx][ver].title, data[idx][ver].value));
-							} else {
-								container_internet_v6.appendChild(this.renderRow(data[idx][ver].title, data[idx][ver].value, classname));
-							}
-						}
-					}
+					if ((ver === 'addrsv4' || ver === 'dnsv4' || ver === 'dnsv6' || ver === 'addrsv6') && Array.isArray(val))
+						val = val.join(', ');
+					box.appendChild(this.renderRow(field.title, val, cls));
 				}
-			}
-
-			container_item.appendChild(container_internet_v4);
-			container_item.appendChild(container_internet_v6);
+			});
 		} else {
-			for(let idx in data) {
-				container_item.appendChild(
-					E('p', { 'class': 'mt-2'}, [
-						E('span', {'class': ''}, [ data[idx].title + '：' ]),
-						E('span', {'class': ''}, [ data[idx].value ])
-					])
-				);
-			}
+			for (const idx in data)
+				box.appendChild(this.renderRow(data[idx].title, data[idx].value));
 		}
 
-		container_box.appendChild(container_item);
-		container_box.appendChild(E('hr'));
-		container_wapper.appendChild(container_box);
-		return container_wapper;
+		card.appendChild(box);
+		return card;
 	},
 
 	renderUpdateWanData(data, v6) {
@@ -200,7 +133,7 @@ return baseclass.extend({
 				this.params.internet.v4.protocol.value=  ifc.getI18n() || E('em', _('Not connected'));
 				this.params.internet.v4.gatewayv4.value =  ifc.getGatewayAddr() || '0.0.0.0';
 				this.params.internet.v4.connected.value = ifc.isUp();
-				this.params.internet.v4.addrsv4.value = ifc.getIPAddrs() || [ '-'];
+				this.params.internet.v4.addrsv4.value = (ifc.getIPAddrs() || ['-']).map(a => a.split('/')[0]);
 				this.params.internet.v4.dnsv4.value = ifc.getDNSAddrs() || [ '-' ];
 			}
 		}
@@ -360,7 +293,28 @@ return baseclass.extend({
 		return this.renderHtml(this.params.router, 'router');
 	},
 
+	renderSummary(data) {
+		// data is the same array passed to render(); compute stat cards + traffic sample.
+		const systeminfo = data[3];
+		const v4 = this.params.internet ? this.params.internet.v4 : null;
+		const connected = v4 ? !!v4.connected.value : false;
+		const stats = [
+			charts.renderStatCard({
+				label: _('Internet'), icon: '🌐',
+				value: E('span', { 'class': connected ? 'dash-badge dash-badge-green' : 'dash-badge dash-badge-red' }, [ connected ? _('Connected') : _('Disconnected') ]),
+				desc: (this.params.internet && this.params.internet.v4.protocol.value) || ''
+			}),
+			charts.renderStatCard({
+				label: _('Uptime'), icon: '⏱',
+				value: systeminfo.uptime ? '%t'.format(systeminfo.uptime) : '-',
+				desc: _('Since last reboot')
+			})
+		];
+		return { stats: stats, trafficSample: this.sampleWanBytes(data[0]) };
+	},
+
 	render(data) {
-		return [this.renderInternetBox(data), this.renderRouterBox(data)];
+		this._lastData = data;
+		return [ this.renderInternetBox(data), this.renderRouterBox(data) ];
 	}
 });
