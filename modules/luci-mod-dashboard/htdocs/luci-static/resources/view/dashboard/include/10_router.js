@@ -294,6 +294,7 @@ return baseclass.extend({
 	},
 
 	renderSummary(data) {
+		if (!data) return {};
 		// data is the same array passed to render(); compute stat cards + traffic sample.
 		const systeminfo = data[3];
 		const v4 = this.params.internet ? this.params.internet.v4 : null;

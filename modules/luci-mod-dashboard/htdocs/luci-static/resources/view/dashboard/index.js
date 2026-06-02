@@ -127,7 +127,6 @@ function startPolling(includes, root) {
 			// swap into the DOM
 			root.style.display = '';
 			root.classList.add('fade-in');
-			root.classList.add('Dashboard');
 			dom.content(root, grid);
 		});
 	};
