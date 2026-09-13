@@ -3,6 +3,8 @@
 'require fs';
 'require rpc';
 'require network';
+'require uci';
+'require view.dashboard.lib.charts as charts';
 
 var callSystemBoard = rpc.declare({
 	object: 'system',
@@ -14,148 +16,142 @@ var callSystemInfo = rpc.declare({
 	method: 'info'
 });
 
+var callGetUnixtime = rpc.declare({
+	object: 'luci',
+	method: 'getUnixtime',
+	expect: { result: 0 }
+});
+
 return baseclass.extend({
 
 	params: [],
 
-	load: function() {
+	load() {
 		return Promise.all([
 			network.getWANNetworks(),
 			network.getWAN6Networks(),
 			L.resolveDefault(callSystemBoard(), {}),
-			L.resolveDefault(callSystemInfo(), {})
+			L.resolveDefault(callSystemInfo(), {}),
+			L.resolveDefault(callGetUnixtime(), 0),
+			uci.load('system')
 		]);
 	},
 
-	renderHtml: function(data, type) {
+	renderValue(value, mono) {
+		if (Array.isArray(value))
+			return E('span', { 'class': 'dashboard-stack' + (mono ? ' dashboard-mono' : '') }, value.map(v => E('span', {}, [ v ])));
 
-		var icon = type;
-		var title = 'router' == type ? _('System') : _('Internet');
-		var container_wapper = E('div', { 'class': type + '-status-self dashboard-bg box-s1'});
-		var container_box = E('div', { 'class': type + '-status-info'});
-		var container_item = E('div', { 'class': 'settings-info'});
+		if (value == null || value === '')
+			return '-';
 
-		if ('internet' == type) {
-			icon = (data.v4.connected.value || data.v6.connected.value) ? type : 'not-internet';
-		}
-
-		container_box.appendChild(E('div', { 'class': 'title'}, [
-			E('img', {
-				'src': L.resource('view/dashboard/icons/' + icon + '.svg'),
-				'width': 'router' == type ? 64 : 54,
-				'title': title,
-				'class': (type == 'router' || icon == 'not-internet') ? 'middle svgmonotone' : 'middle'
-			}),
-			E('h3', title)
-		]));
-
-		container_box.appendChild(E('hr'));
-
-		if ('internet' == type) {
-			var container_internet_v4 = E('div');
-			var container_internet_v6 = E('div');
-
-			for(var idx in data) {
-
-				for(var ver in data[idx]) {
-					var classname = ver,
-						suppelements = '',
-						visible = data[idx][ver].visible;
-
-					if('connected' === ver) {
-						classname = data[idx][ver].value ? 'label label-success' : 'label label-danger';
-						data[idx][ver].value = data[idx][ver].value ? _('yes') : _('no');
-					}
-
-					if ('v4' === idx) {
-
-						if ('title' === ver) {
-							container_internet_v4.appendChild(
-								E('p', { 'class': 'mt-2'}, [
-									E('span', {'class': ''}, [ data[idx].title ]),
-								])
-							);
-							continue;
-						}
-
-						if ('addrsv4' === ver) {
-							var addrs = data[idx][ver].value;
-							if(Array.isArray(addrs) && addrs.length) {
-								for(var ip in addrs) {
-									data[idx][ver].value = addrs[ip].split('/')[0];
-								}
-							}
-						}
-
-						if (visible) {
-							container_internet_v4.appendChild(
-								E('p', { 'class': 'mt-2'}, [
-									E('span', {'class': ''}, [ data[idx][ver].title + '：' ]),
-									E('span', {'class': classname }, [ data[idx][ver].value ]),
-									suppelements
-								])
-							);
-						}
-
-					} else {
-
-						if ('title' === ver) {
-							container_internet_v6.appendChild(
-								E('p', { 'class': 'mt-2'}, [
-									E('span', {'class': ''}, [ data[idx].title ]),
-								])
-							);
-							continue;
-						}
-
-						if (visible) {
-							container_internet_v6.appendChild(
-								E('p', {'class': 'mt-2'}, [
-									E('span', {'class': ''}, [data[idx][ver].title + '：']),
-									E('span', {'class': classname}, [data[idx][ver].value]),
-									suppelements
-								])
-							);
-						}
-					}
-				}
-			}
-
-			container_item.appendChild(container_internet_v4);
-			container_item.appendChild(container_internet_v6);
-		} else {
-			for(var idx in data) {
-				container_item.appendChild(
-					E('p', { 'class': 'mt-2'}, [
-						E('span', {'class': ''}, [ data[idx].title + '：' ]),
-						E('span', {'class': ''}, [ data[idx].value ])
-					])
-				);
-			}
-		}
-
-		container_box.appendChild(container_item);
-		container_box.appendChild(E('hr'));
-		container_wapper.appendChild(container_box);
-		return container_wapper;
+		return mono ? E('span', { 'class': 'dashboard-mono' }, [ value ]) : value;
 	},
 
-	renderUpdateWanData: function(data, v6) {
+	renderKeyValueTable(rows) {
+		return E('table', { 'class': 'table dashboard-kv' }, rows.map(row => E('tr', { 'class': 'tr' }, [
+			E('td', { 'class': 'td' }, [ row.title ]),
+			E('td', { 'class': 'td' + (row.mono ? ' dashboard-mono' : '') }, [ this.renderValue(row.value, row.mono) ])
+		])));
+	},
 
-		var min_metric = 2000000000;
-		var min_metric_i = 0;
-		for (var i = 0; i < data.length; i++) {
-			var metric = data[i].getMetric();
+	renderInternetColumn(group) {
+		const connected = group.connected.value === true;
+		const rows = [];
+
+		for (const key in group) {
+			if (key == 'title' || key == 'connected' || !group[key].visible)
+				continue;
+
+			let value = group[key].value;
+
+			if (key == 'addrsv4' && Array.isArray(value))
+				value = value.map(a => a.split('/')[0]);
+
+			rows.push({
+				title: group[key].title,
+				value: value,
+				mono: /^(addrs|gateway|dns|ipprefix)/.test(key)
+			});
+		}
+
+		return E('div', { 'class': 'dashboard-kv-col' }, [
+			E('div', { 'class': 'dashboard-kv-head' }, [
+				E('span', {}, [ group.title ]),
+				charts.badge(connected ? _('Connected') : _('Not connected'), connected ? 'success' : 'important')
+			]),
+			connected ? this.renderKeyValueTable(rows) : charts.empty(_('Not configured or no address acquired'))
+		]);
+	},
+
+	renderInternetTab() {
+		return E('div', { 'class': 'dashboard-kv-grid' }, [
+			this.renderInternetColumn(this.params.internet.v4),
+			this.renderInternetColumn(this.params.internet.v6)
+		]);
+	},
+
+	renderSystemTab() {
+		const rows = [];
+
+		for (const key in this.params.router)
+			rows.push({
+				title: this.params.router[key].title,
+				value: this.params.router[key].value,
+				mono: (key == 'kernel' || key == 'localtime')
+			});
+
+		return this.renderKeyValueTable(rows);
+	},
+
+	renderInternetKpi() {
+		const v4 = this.params.internet.v4;
+		const v6 = this.params.internet.v6;
+		const connected = (v4.connected.value === true || v6.connected.value === true);
+		const sub = [
+			charts.badge('IPv4', (v4.connected.value === true) ? 'success' : 'important'),
+			charts.badge('IPv6', (v6.connected.value === true) ? 'success' : 'important')
+		];
+
+		if (v4.connected.value === true && Array.isArray(v4.addrsv4.value) && v4.addrsv4.value.length)
+			sub.push(E('span', { 'class': 'dashboard-mono' }, [ v4.addrsv4.value[0].split('/')[0] ]));
+
+		return charts.kpi({
+			className: 'internet-status-self',
+			icon: connected ? 'internet' : 'not-internet',
+			title: _('Internet'),
+			value: [ connected ? _('Connected') : _('Not connected') ],
+			sub: sub
+		});
+	},
+
+	renderSystemKpi() {
+		const router = this.params.router;
+
+		return charts.kpi({
+			className: 'router-status-self',
+			icon: 'router',
+			title: router.uptime.title,
+			value: [ router.uptime.value || '-' ],
+			sub: [ router.model.value || '' ]
+		});
+	},
+
+	renderUpdateWanData(data, v6) {
+
+		let min_metric = 2000000000;
+		let min_metric_i = 0;
+		for (let i = 0; i < data.length; i++) {
+			const metric = data[i].getMetric();
 			if (metric < min_metric) {
 				min_metric = metric;
 				min_metric_i = i;
 			}
 		 }
 
-		var ifc = data[min_metric_i];
+		const ifc = data[min_metric_i];
 		if(ifc){
 			if (v6) {
-				var uptime = ifc.getUptime();
+				const uptime = ifc.getUptime();
 				this.params.internet.v6.uptime.value = (uptime > 0) ? '%t'.format(uptime) : '-';
 				this.params.internet.v6.ipprefixv6.value =  ifc.getIP6Prefix() || '-';
 				this.params.internet.v6.gatewayv6.value =  ifc.getGateway6Addr() || '-';
@@ -164,7 +160,7 @@ return baseclass.extend({
 				this.params.internet.v6.dnsv6.value = ifc.getDNS6Addrs() || [ '-' ];
 				this.params.internet.v6.connected.value = ifc.isUp();
 			} else {
-				var uptime = ifc.getUptime();
+				const uptime = ifc.getUptime();
 				this.params.internet.v4.uptime.value = (uptime > 0) ? '%t'.format(uptime) : '-';
 				this.params.internet.v4.protocol.value=  ifc.getI18n() || E('em', _('Not connected'));
 				this.params.internet.v4.gatewayv4.value =  ifc.getGatewayAddr() || '0.0.0.0';
@@ -175,7 +171,7 @@ return baseclass.extend({
 		}
 	},
 
-	renderInternetBox: function(data) {
+	renderInternetBox(data) {
 
 		this.params.internet = {
 
@@ -268,28 +264,28 @@ return baseclass.extend({
 
 		this.renderUpdateWanData(data[0], false);
 		this.renderUpdateWanData(data[1], true);
-
-		return this.renderHtml(this.params.internet, 'internet');
 	},
 
-	renderRouterBox: function(data) {
+	renderRouterBox(data) {
 
-		var boardinfo   = data[2],
-			systeminfo  = data[3];
+		const boardinfo   = data[2];
+		const systeminfo  = data[3];
+		const unixtime    = data[4];
 
-		var datestr = null;
+		let datestr = null;
 
-		if (systeminfo.localtime) {
-			var date = new Date(systeminfo.localtime * 1000);
+		if (unixtime) {
+			const date = new Date(unixtime * 1000);
+			const zn = uci.get('system', '@system[0]', 'zonename')?.replaceAll(' ', '_') || 'UTC';
+			const ts = uci.get('system', '@system[0]', 'clock_timestyle') || 0;
+			const hc = uci.get('system', '@system[0]', 'clock_hourcycle') || 0;
 
-			datestr = '%04d-%02d-%02d %02d:%02d:%02d'.format(
-				date.getUTCFullYear(),
-				date.getUTCMonth() + 1,
-				date.getUTCDate(),
-				date.getUTCHours(),
-				date.getUTCMinutes(),
-				date.getUTCSeconds()
-			);
+			datestr = new Intl.DateTimeFormat(undefined, {
+				dateStyle: 'medium',
+				timeStyle: (ts == 0) ? 'long' : 'full',
+				hourCycle: (hc == 0) ? undefined : hc,
+				timeZone: zn
+			}).format(date);
 		}
 
 		this.params.router = {
@@ -323,11 +319,18 @@ return baseclass.extend({
 				value: boardinfo?.release?.description
 			}
 		};
-
-		return this.renderHtml(this.params.router, 'router');
 	},
 
-	render: function(data) {
-		return [this.renderInternetBox(data), this.renderRouterBox(data)];
+	render(data) {
+		this.renderInternetBox(data);
+		this.renderRouterBox(data);
+
+		return {
+			kpi: [ this.renderInternetKpi(), this.renderSystemKpi() ],
+			tabs: [
+				{ id: 'internet', title: _('Internet'), content: this.renderInternetTab() },
+				{ id: 'system', title: _('System'), content: this.renderSystemTab() }
+			]
+		};
 	}
 });
