@@ -15,6 +15,15 @@ return baseclass.extend({
 
 	params: {},
 
+	widgets: [
+		{ id: 'dhcp', slot: 'cards', title: _('DHCP Devices'), order: 50, hidden: true },
+		{ id: 'dhcp', slot: 'tabs', title: _('DHCP Devices'), order: 40 }
+	],
+
+	available() {
+		return L.hasSystemFeature('dnsmasq') || L.hasSystemFeature('odhcpd');
+	},
+
 	load() {
 		return Promise.all([
 			callLuciDHCPLeases(),
@@ -56,13 +65,10 @@ return baseclass.extend({
 	},
 
 	render([leases]) {
-		if (!L.hasSystemFeature('dnsmasq') && !L.hasSystemFeature('odhcpd'))
-			return null;
-
 		this.renderUpdateData([...leases.dhcp_leases]);
 
 		return {
-			kpi: [ this.renderKpi() ],
+			cards: [ { id: 'dhcp', node: this.renderKpi() } ],
 			tabs: [
 				{ id: 'dhcp', title: this.title, count: this.params.lan.devices.length, content: this.renderTable() }
 			]
