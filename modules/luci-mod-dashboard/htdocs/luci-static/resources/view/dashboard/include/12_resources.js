@@ -153,12 +153,17 @@ return baseclass.extend({
 		if (load)
 			rows.push([ _('Load average'), '%.2f, %.2f, %.2f'.format(load[0], load[1], load[2]) ]);
 
-		rows.push([ _('CPU usage'), cpu ? progressbar(cpu.cpu.busy, '%.1f%% (user %.1f · system %.1f · iowait %.1f · irq %.1f · softirq %.1f · steal %.1f)'.format(
-			cpu.cpu.busy, cpu.cpu.user, cpu.cpu.system, cpu.cpu.iowait, cpu.cpu.irq, cpu.cpu.softirq, cpu.cpu.steal)) : pending() ]);
+		const core = (title, share) => [
+			E('span', { 'data-tooltip': 'user %.1f · system %.1f · iowait %.1f · irq %.1f · softirq %.1f · steal %.1f'.format(
+				share.user, share.system, share.iowait, share.irq, share.softirq, share.steal) }, [ title ]),
+			progressbar(share.busy, '%.1f%%'.format(share.busy))
+		];
+
+		rows.push(cpu ? core(_('CPU usage'), cpu.cpu) : [ _('CPU usage'), pending() ]);
 
 		if (cpu && Object.keys(cpu).length > 2)
 			Object.keys(cpu).filter(name => name != 'cpu' && cpu[name] != null).forEach(name => {
-				rows.push([ name.replace(/^cpu/, _('CPU') + ' '), progressbar(cpu[name].busy, '%.1f%%'.format(cpu[name].busy)) ]);
+				rows.push(core(name.replace(/^cpu/, _('CPU') + ' '), cpu[name]));
 			});
 
 		if (mem) {
