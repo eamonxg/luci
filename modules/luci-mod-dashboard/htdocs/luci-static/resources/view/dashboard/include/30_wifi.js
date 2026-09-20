@@ -189,7 +189,7 @@ return baseclass.extend({
 			if (radio[key].visible)
 				fields.push(E('div', {}, [
 					E('span', {}, [ radio[key].title ]),
-					E((key == 'bssid') ? 'code' : 'b', {}, [ radio[key].value ])
+					E('b', {}, [ radio[key].value ])
 				]));
 
 		return E('div', { 'class': 'ifacebox' }, [
@@ -214,9 +214,9 @@ return baseclass.extend({
 				_('Hostname'),
 				_('SSID'),
 				'%s / %s'.format(_('Signal'), _('Noise floor')),
-				{ text: _('Up.'), className: 'right' },
-				{ text: _('Down.'), className: 'right' },
-				{ text: _('Connected'), className: 'right' }
+				_('Up.'),
+				_('Down.'),
+				_('Connected')
 			],
 			rows: this.params.wifi.devices.map(device => [
 				device.hostname.value,
@@ -228,12 +228,12 @@ return baseclass.extend({
 						? E('small', {}, [ '/ %d %s'.format(device.signal.value.noise, _('dBm')) ])
 						: ''
 				]),
-				{ text: device.transferred.value.rx, className: 'right' },
-				{ text: device.transferred.value.tx, className: 'right' },
-				{ text: device.connected.value || '-', className: 'right' }
+				device.transferred.value.rx,
+				device.transferred.value.tx,
+				device.connected.value || '-'
 			]),
 			emptyText: _('No wireless clients connected'),
-			foot: [ '', _('Total'), String(this.params.wifi.devices.length), '', '', '' ]
+			foot: [ _('Total'), String(this.params.wifi.devices.length) ]
 		});
 	},
 

@@ -21,7 +21,6 @@ return baseclass.extend({
 		]);
 	},
 
-	// The uplink with the lowest metric, as the Internet card picks it.
 	uplink(wan, wan6) {
 		const pick = list => list.slice().sort((a, b) => a.getMetric() - b.getMetric())[0];
 

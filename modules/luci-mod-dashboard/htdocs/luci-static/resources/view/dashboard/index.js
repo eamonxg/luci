@@ -11,7 +11,6 @@ document.querySelector('head').appendChild(E('link', {
 	'href': L.resource('view/dashboard/css/custom.css') + (L.env.resource_version ? '?v=' + L.env.resource_version : '')
 }));
 
-// Most items a row may hold, and whether the shorter rows go on top.
 const ROWS = {
 	cards: { max: 5, shortFirst: false },
 	charts: { max: 3, shortFirst: true }
@@ -22,12 +21,11 @@ function invokeIncludesLoad(includes, layout) {
 	let has_load = false;
 
 	for (let i = 0; i < includes.length; i++) {
-		const widgets = includes[i].widgets || [];
+		const declared = includes[i].widgets || [];
 
 		includes[i].failed = false;
 
-		// An include with none of its widgets on the page is not polled.
-		includes[i].skipped = (widgets.length > 0 && !widgets.some(widget => layout[widget.slot].includes(widget.id)));
+		includes[i].skipped = (declared.length > 0 && !declared.some(widget => layout[widget.slot]?.includes(widget.id)));
 
 		if (includes[i].skipped) {
 			tasks.push(null);
@@ -109,7 +107,6 @@ function rowSizes(n, max, shortFirst) {
 	return sizes;
 }
 
-// Tell each item how many share its row, so every row fills the width.
 function fillRows(nodes, slot) {
 	let i = 0;
 
@@ -168,7 +165,6 @@ function restoreChartScroll(root, positions) {
 function startPolling(includes, layout, root, form) {
 	let loading = null;
 
-	// The layout form and the form library are fetched when first looked at.
 	const showForm = () => {
 		loading ??= L.require('view.dashboard.lib.layout')
 			.then(layoutForm => layoutForm.render(includes))
@@ -217,7 +213,6 @@ function startPolling(includes, layout, root, form) {
 	return step().then(() => {
 		poll.add(step);
 
-		// A page nobody looks at has no reason to keep querying the router.
 		// Only resume what was stopped here, not a poll the user has paused.
 		let paused = false;
 

@@ -36,14 +36,15 @@ function rateUnit(value) {
 }
 
 return baseclass.extend({
-	// Each value picks its own unit, so a small one next to a big one
-	// does not end up as "0.0 Gbit/s".
 	formatRate(value) {
-		return (value != null) ? '%1000.1mbit/s'.format(Math.round(value)) : '-';
+		if (value == null)
+			return '-';
+
+		const exp = rateUnit(value);
+
+		return '%.1f %s'.format(value / Math.pow(1000, exp), RATE_UNITS[exp]);
 	},
 
-	// Four ticks in the unit the peak falls into; the interval is the
-	// smallest 1-2-2.5-5 step whose fourth multiple covers the peak.
 	rateScale(peak) {
 		const exp = rateUnit(peak);
 		const unit = Math.pow(1000, exp);
@@ -78,19 +79,17 @@ return baseclass.extend({
 	},
 
 	kpi(opts) {
-		const sub = [];
-
-		(opts.sub || []).filter(part => part != null && part !== '').forEach(part => {
-			sub.push(sub.length ? ' · ' : '', part);
-		});
+		const parts = (opts.sub || []).filter(part => part != null && part !== '');
+		const sub = opts.stacked
+			? parts.map(part => E('small', { 'class': 'dashboard-kpi-sub dashboard-kpi-line', 'title': part }, [ part ]))
+			: [ E('small', { 'class': 'dashboard-kpi-sub' }, parts.flatMap((part, i) => i ? [ ' · ', part ] : [ part ])) ];
 
 		return E('div', { 'class': 'cbi-section dashboard-kpi ' + (opts.className || '') }, [
 			this.icon(opts.icon, 'dashboard-kpi-icon'),
 			E('div', { 'class': 'dashboard-kpi-text' }, [
 				E('small', {}, [ opts.title ]),
-				E('strong', { 'class': 'dashboard-kpi-value' }, opts.value),
-				E('small', { 'class': 'dashboard-kpi-sub' }, sub)
-			])
+				E('strong', { 'class': 'dashboard-kpi-value' }, opts.value)
+			].concat(sub))
 		]);
 	},
 
@@ -98,26 +97,16 @@ return baseclass.extend({
 		return E('em', {}, [ text ]);
 	},
 
-	// A cell is a string, a DOM node or a descriptor `{ text, className }`.
-	cell(tag, cell, title) {
-		const descr = (cell != null && typeof(cell) == 'object' && !(cell instanceof Node)) ? cell : { text: cell };
-
-		return E(tag, {
-			'class': tag + (descr.className ? ' ' + descr.className : ''),
-			'data-title': (typeof(title) == 'string' && title !== '') ? title : null
-		}, [ (descr.text != null) ? descr.text : '' ]);
-	},
-
 	// Same markup as ui.Table: flat .table > .tr, header row .table-titles,
 	// data-title on the cells so themes can label them on phones.
 	table(opts) {
-		const titles = opts.head.map(cell => (cell != null && typeof(cell) == 'object' && !(cell instanceof Node)) ? cell.text : cell);
+		const cell = (tag, content, title) => E(tag, { 'class': tag, 'data-title': title || null }, [ content ?? '' ]);
 		const table = E('table', { 'class': 'table ' + (opts.className || '') }, [
-			E('tr', { 'class': 'tr table-titles' }, opts.head.map(cell => this.cell('th', cell)))
+			E('tr', { 'class': 'tr table-titles' }, opts.head.map(title => cell('th', title)))
 		]);
 
 		opts.rows.forEach((row, i) => {
-			table.appendChild(E('tr', { 'class': 'tr ' + (i % 2 ? 'cbi-rowstyle-2' : 'cbi-rowstyle-1') }, row.map((cell, n) => this.cell('td', cell, titles[n]))));
+			table.appendChild(E('tr', { 'class': 'tr ' + (i % 2 ? 'cbi-rowstyle-2' : 'cbi-rowstyle-1') }, row.map((content, n) => cell('td', content, opts.head[n]))));
 		});
 
 		if (!opts.rows.length && opts.emptyText)
@@ -125,8 +114,12 @@ return baseclass.extend({
 				E('td', { 'class': 'td', 'colspan': opts.head.length }, [ E('em', {}, [ opts.emptyText ]) ])
 			]));
 
-		if (opts.foot)
-			table.appendChild(E('tr', { 'class': 'tr' }, opts.foot.map(cell => this.cell('td', cell))));
+		if (opts.foot) {
+			const foot = E('tr', { 'class': 'tr' }, opts.foot.map(content => cell('td', content)));
+
+			foot.lastChild.setAttribute('colspan', opts.head.length - opts.foot.length + 1);
+			table.appendChild(foot);
+		}
 
 		return table;
 	},

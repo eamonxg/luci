@@ -46,11 +46,11 @@ return baseclass.extend({
 			head: [ _('Hostname'), _('IP Address'), _('MAC') ],
 			rows: this.params.lan.devices.map(device => [
 				device.hostname,
-				E('code', {}, [ device.ipv4 ]),
-				E('code', {}, [ device.macaddr ])
+				device.ipv4,
+				device.macaddr
 			]),
 			emptyText: _('No active leases'),
-			foot: [ '', _('Total'), String(this.params.lan.devices.length) ]
+			foot: [ _('Total'), String(this.params.lan.devices.length) ]
 		});
 	},
 

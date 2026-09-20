@@ -8,8 +8,6 @@ const SLOTS = [ 'cards', 'charts', 'tabs' ];
 return baseclass.extend({
 	slots: SLOTS,
 
-	// The includes this device has a use for, e.g. no wireless without a
-	// radio. The others are neither polled nor offered in the layout.
 	load() {
 		return L.resolveDefault(fs.list('/www' + L.resource('view/dashboard/include')), []).then(entries => {
 			return Promise.all(entries.filter(e => {
@@ -29,7 +27,6 @@ return baseclass.extend({
 		});
 	},
 
-	// The widgets of a slot, in their default order.
 	list(includes, slot) {
 		return includes.reduce((list, include) => list.concat(include.widgets || []), [])
 			.filter(widget => widget.slot == slot)

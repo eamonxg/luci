@@ -139,6 +139,12 @@
 	overflow-wrap: anywhere;
 }
 
+.dashboard-kpi-line {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
 /* ---- Donut ---- */
 /* Shorter than the bar charts it shares a row with, so centre it. */
 .dashboard-donut {

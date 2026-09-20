@@ -10,8 +10,6 @@ const callHistory = rpc.declare({
 
 const SEQ = 0, TIME = 1;
 
-// The router's recent samples, for the includes to share. It does the
-// sampling, so a reload or a hidden tab costs the charts nothing.
 return baseclass.extend({
 	samples: [],
 	step: 5000,
@@ -47,12 +45,10 @@ return baseclass.extend({
 		return this.pending;
 	},
 
-	// What to show where the values are not there.
 	status() {
 		return this.failed ? _('No data received') : _('Collecting data...');
 	},
 
-	// How far back the charts reach, in seconds.
 	span() {
 		return this.slots * this.step / 1000;
 	},
@@ -61,7 +57,6 @@ return baseclass.extend({
 		return (prev != null && cur[TIME] - prev[TIME] <= 2.5 * this.step);
 	},
 
-	// The latest two samples, when a difference of them means something.
 	pair() {
 		const cur = this.samples[this.samples.length - 1];
 		const prev = this.samples[this.samples.length - 2];

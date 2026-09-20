@@ -12,8 +12,6 @@ const callSystemInfo = rpc.declare({
 	method: 'info'
 });
 
-// System information for the includes to share, so that several of them
-// wanting it still makes one call per poll.
 return baseclass.extend({
 	info() {
 		const now = performance.now();

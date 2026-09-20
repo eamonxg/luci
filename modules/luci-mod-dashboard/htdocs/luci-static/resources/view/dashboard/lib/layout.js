@@ -6,17 +6,16 @@
 'require view.dashboard.lib.widgets as widgets';
 
 return baseclass.extend({
-	// One list per slot: what is in it is shown, in that order.
 	render(includes) {
-		const hint = _('Drag to reorder; leave empty to use the defaults.');
 		const slots = {
-			cards: [ _('Status cards'), _('The status cards at the top of the page.') ],
-			charts: [ _('Charts'), _('The charts in the middle of the page.') ],
-			tabs: [ _('Tabs'), _('The tabs at the bottom of the page.') ]
+			cards: _('Status cards'),
+			charts: _('Live charts'),
+			tabs: _('Detail tabs')
 		};
 
 		const m = new form.Map('dashboard');
-		const s = m.section(form.NamedSection, 'layout', 'dashboard');
+		const s = m.section(form.NamedSection, 'layout', 'dashboard', null,
+			_('The lists follow the page from top to bottom. What is in a list is shown, in that order: drag an entry to move it. An empty list shows the defaults.'));
 
 		widgets.slots.forEach(slot => {
 			const choices = widgets.list(includes, slot);
@@ -24,7 +23,7 @@ return baseclass.extend({
 			if (!choices.length)
 				return;
 
-			const o = s.option(form.DynamicList, slot, slots[slot][0], '%s %s'.format(slots[slot][1], hint));
+			const o = s.option(form.DynamicList, slot, slots[slot]);
 
 			choices.forEach(widget => o.value(widget.id, widget.title));
 
@@ -35,6 +34,21 @@ return baseclass.extend({
 				const ids = L.toArray(uci.get('dashboard', 'layout', slot)).filter(id => known.includes(id));
 
 				return ids.length ? ids : widgets.defaults(includes, slot);
+			};
+
+			// The list hides a choice once it is picked, but not the ones it
+			// starts out with, and always offers a custom value.
+			o.renderWidget = function(section_id, option_index, cfgvalue) {
+				const node = form.DynamicList.prototype.renderWidget.apply(this, arguments);
+				const shown = L.toArray(cfgvalue);
+
+				node.querySelectorAll('.cbi-dropdown ul > li[data-value]').forEach(li => {
+					if (shown.includes(li.getAttribute('data-value')))
+						li.setAttribute('unselectable', '');
+				});
+				node.querySelector('.create-item-input').parentNode.remove();
+
+				return node;
 			};
 		});
 
