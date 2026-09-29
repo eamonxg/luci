@@ -21,13 +21,17 @@ return baseclass.extend({
 		return L.resolveDefault(callHistory(last ? last[SEQ] : 0, this.id || ''), null).then(res => {
 			this.failed = (!L.isObject(res) || !Array.isArray(res.samples));
 
-			if (this.failed)
+			if (this.failed) {
+				// Old samples must not appear as current CPU usage or live traffic.
+				this.samples = [];
 				return;
+			}
 
 			if (res.id != this.id)
 				this.samples = [];
 
 			this.id = res.id;
+			this.now = res.now;
 			this.step = res.step;
 			this.slots = res.slots;
 			this.samples = this.samples.concat(res.samples).filter(sample => sample[TIME] > res.now - res.step * res.slots);
@@ -54,7 +58,7 @@ return baseclass.extend({
 	},
 
 	near(prev, cur) {
-		return (prev != null && cur[TIME] - prev[TIME] <= 2.5 * this.step);
+		return (prev != null && cur[TIME] > prev[TIME] && cur[TIME] - prev[TIME] <= 2.5 * this.step);
 	},
 
 	pair() {

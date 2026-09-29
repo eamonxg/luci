@@ -43,6 +43,7 @@ return baseclass.extend({
 
 	renderTable() {
 		return charts.table({
+			id: 'dashboard-lan-table',
 			head: [ _('Hostname'), _('IP Address'), _('MAC') ],
 			rows: this.params.lan.devices.map(device => [
 				device.hostname,
@@ -68,9 +69,9 @@ return baseclass.extend({
 		this.renderUpdateData([...leases.dhcp_leases]);
 
 		return {
-			cards: [ { id: 'dhcp', node: this.renderKpi() } ],
+			cards: [ { id: 'dhcp', node: () => this.renderKpi() } ],
 			tabs: [
-				{ id: 'dhcp', title: this.title, count: this.params.lan.devices.length, content: this.renderTable() }
+				{ id: 'dhcp', title: this.title, count: this.params.lan.devices.length, content: () => this.renderTable() }
 			]
 		};
 	}

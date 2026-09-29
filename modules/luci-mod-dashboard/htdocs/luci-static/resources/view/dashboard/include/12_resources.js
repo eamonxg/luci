@@ -194,12 +194,12 @@ return baseclass.extend({
 
 		return {
 			cards: [
-				{ id: 'cpu', node: this.renderCpuCard(cpu, cores, load) },
-				{ id: 'memory', node: this.renderMemoryCard(mem) },
-				{ id: 'load', node: this.renderLoadCard(load) }
+				{ id: 'cpu', node: () => this.renderCpuCard(cpu, cores, load) },
+				{ id: 'memory', node: () => this.renderMemoryCard(mem) },
+				{ id: 'load', node: () => this.renderLoadCard(load) }
 			],
-			charts: [ { id: 'system', node: this.renderChart(cores, mem) } ],
-			tabs: [ { id: 'resources', title: _('Resources'), content: this.renderTab(cpu, mem, load, info.swap) } ]
+			charts: [ { id: 'system', node: () => this.renderChart(cores, mem) } ],
+			tabs: [ { id: 'resources', title: _('Resources'), content: () => this.renderTab(cpu, mem, load, info.swap) } ]
 		};
 	}
 });

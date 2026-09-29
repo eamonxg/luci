@@ -309,12 +309,12 @@ return baseclass.extend({
 
 		return {
 			cards: [
-				{ id: 'internet', node: this.renderInternetKpi() },
-				{ id: 'uptime', node: this.renderSystemKpi() }
+				{ id: 'internet', node: () => this.renderInternetKpi() },
+				{ id: 'uptime', node: () => this.renderSystemKpi() }
 			],
 			tabs: [
-				{ id: 'internet', title: _('Internet'), content: this.renderInternetTab() },
-				{ id: 'system', title: _('System'), content: this.renderSystemTab() }
+				{ id: 'internet', title: _('Internet'), content: () => this.renderInternetTab() },
+				{ id: 'system', title: _('System'), content: () => this.renderSystemTab() }
 			]
 		};
 	}
