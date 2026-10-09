@@ -1,0 +1,104 @@
+'use strict';
+
+import * as uloop from 'uloop';
+import { discover, sample } from 'luci.dashboard.temperature';
+
+const CACHE = 10000, DISCOVERY = 60000, TIMEOUT = 1000, MAX_WAITERS = 32;
+let sources, discovered = 0, cached, sampled = 0, retry = 0, failures = 0;
+let worker, deadline, pending = [], generation = 0;
+
+function now() {
+	const t = clock(true);
+	return t[0] * 1000 + int(t[1] / 1000000);
+}
+
+function response() {
+	return { status: cached?.status ?? 'error', sensors: cached?.sensors ?? [], age_ms: sampled ? now() - sampled : null };
+}
+
+function reply() {
+	const requests = pending;
+	pending = [];
+	for (let request in requests) {
+		// A client may have gone away while the worker was running.
+		try { request.reply(response()); }
+		catch (e) { /* The next client still receives its reply. */ }
+	}
+}
+
+function failed() {
+	failures = min(failures + 1, 5);
+	retry = now() + min(300000, 30000 * (2 ** (failures - 1)));
+	cached = { status: 'error', sensors: map(sources ?? [], s => ({ id: s.id, category: s.category, label: s.label, celsius: null })) };
+	sampled = 0;
+	discovered = 0;
+	reply();
+}
+
+return {
+	'luci.dashboard.temperature': {
+		read: {
+			call: function(request) {
+				const t = now();
+				if (t < retry || (cached && t - sampled < (cached.status == 'unsupported' ? DISCOVERY : CACHE)))
+					return response();
+
+				// Never start a second worker while an old driver read is stuck.
+				if (worker && worker.finished())
+					worker = null;
+				if (worker && !length(pending))
+					return response();
+				if (length(pending) >= MAX_WAITERS)
+					return { status: 'error', sensors: [], age_ms: null };
+
+				const deferred = request.defer();
+				push(pending, request);
+				if (worker)
+					return deferred;
+
+				const token = ++generation;
+				const refresh = sources == null || !discovered || t - discovered >= DISCOVERY;
+				try {
+					worker = uloop.task(() => {
+						const list = refresh ? discover('/sys') : sources;
+						return list == null ? null : { sources: list, result: sample(list) };
+					}, data => {
+						if (token != generation)
+							return;
+						deadline.cancel();
+						if (data == null) {
+							failed();
+							return;
+						}
+						sources = data.sources;
+						cached = data.result;
+						sampled = now();
+						if (refresh)
+							discovered = sampled;
+						if (cached.status == 'error' || cached.status == 'partial') {
+							failures = min(failures + 1, 5);
+							retry = sampled + min(300000, 30000 * (2 ** (failures - 1)));
+							discovered = 0;
+						}
+						else {
+							failures = 0;
+							retry = 0;
+						}
+						reply();
+					});
+					if (!worker) {
+						failed();
+						return deferred;
+					}
+					deadline = uloop.timer(TIMEOUT, () => {
+						generation++;
+						worker.kill();
+						failed();
+					});
+				}
+				catch (e) { failed(); }
+				return deferred;
+			}
+		}
+	}
+};
