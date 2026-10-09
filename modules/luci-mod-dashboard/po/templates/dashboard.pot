@@ -447,3 +447,93 @@ msgstr ""
 #: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/lib/charts.js:278
 msgid "now"
 msgstr ""
+
+#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/include/13_temperature.js
+msgid "Temperature"
+msgstr ""
+
+#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/include/13_temperature.js
+msgid "Temperatures"
+msgstr ""
+
+#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/include/13_temperature.js
+msgid "Highest CPU temperature"
+msgstr ""
+
+#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/include/13_temperature.js
+msgid "Highest temperature"
+msgstr ""
+
+#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/include/13_temperature.js
+msgid "No supported temperature sensors found"
+msgstr ""
+
+#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/include/13_temperature.js
+msgid "Temperature temporarily unavailable"
+msgstr ""
+
+#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/include/13_temperature.js
+msgid "Wi-Fi"
+msgstr ""
+
+#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/include/13_temperature.js
+msgid "Ethernet"
+msgstr ""
+
+#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/include/13_temperature.js
+msgid "Other sensors"
+msgstr ""
+
+#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/include/13_temperature.js
+msgid "Some temperature sensors are unavailable"
+msgstr ""
+
+#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/include/13_temperature.js
+#, javascript-format
+msgid "Reading age: %d seconds"
+msgstr ""
+
+#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/include/13_temperature.js
+msgid "Sensor"
+msgstr ""
+
+#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/include/13_temperature.js
+msgid "CPU temperature"
+msgstr ""
+
+#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/include/13_temperature.js
+msgid "SoC temperature"
+msgstr ""
+
+#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/include/13_temperature.js
+msgid "SoC"
+msgstr ""
+
+#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/include/13_temperature.js
+msgid "Ethernet PHY"
+msgstr ""
+
+#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/include/13_temperature.js
+msgid "Storage"
+msgstr ""
+
+#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/include/13_temperature.js
+msgid "Component"
+msgstr ""
+
+#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/include/13_temperature.js
+#, javascript-format
+msgid "Sensors: %d"
+msgstr ""
+
+msgid "Motherboard"
+msgstr ""
+
+msgid "GPU"
+msgstr ""
+
+msgid "Processor temperature"
+msgstr ""
+
+msgid "Processor temperature unavailable"
+msgstr ""

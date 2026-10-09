@@ -479,3 +479,93 @@ msgstr "立即"
 
 #~ msgid "Upload"
 #~ msgstr "上传"
+
+#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/include/13_temperature.js
+msgid "Temperature"
+msgstr "温度"
+
+#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/include/13_temperature.js
+msgid "Temperatures"
+msgstr "温度详情"
+
+#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/include/13_temperature.js
+msgid "Highest CPU temperature"
+msgstr "CPU 最高温度"
+
+#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/include/13_temperature.js
+msgid "Highest temperature"
+msgstr "最高温度"
+
+#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/include/13_temperature.js
+msgid "No supported temperature sensors found"
+msgstr "未发现支持的温度传感器"
+
+#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/include/13_temperature.js
+msgid "Temperature temporarily unavailable"
+msgstr "暂时无法读取温度"
+
+#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/include/13_temperature.js
+msgid "Wi-Fi"
+msgstr "Wi-Fi"
+
+#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/include/13_temperature.js
+msgid "Ethernet"
+msgstr "以太网"
+
+#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/include/13_temperature.js
+msgid "Other sensors"
+msgstr "其他传感器"
+
+#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/include/13_temperature.js
+msgid "Some temperature sensors are unavailable"
+msgstr "部分温度传感器不可用"
+
+#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/include/13_temperature.js
+#, javascript-format
+msgid "Reading age: %d seconds"
+msgstr "读数采集于 %d 秒前"
+
+#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/include/13_temperature.js
+msgid "Sensor"
+msgstr "传感器"
+
+#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/include/13_temperature.js
+msgid "CPU temperature"
+msgstr "CPU 温度"
+
+#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/include/13_temperature.js
+msgid "SoC temperature"
+msgstr "SoC 温度"
+
+#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/include/13_temperature.js
+msgid "SoC"
+msgstr "SoC"
+
+#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/include/13_temperature.js
+msgid "Ethernet PHY"
+msgstr "以太网 PHY"
+
+#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/include/13_temperature.js
+msgid "Storage"
+msgstr "存储设备"
+
+#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/include/13_temperature.js
+msgid "Component"
+msgstr "部件"
+
+#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/include/13_temperature.js
+#, javascript-format
+msgid "Sensors: %d"
+msgstr "传感器：%d"
+
+msgid "Motherboard"
+msgstr "主板"
+
+msgid "GPU"
+msgstr "GPU"
+
+msgid "Processor temperature"
+msgstr "处理器温度"
+
+msgid "Processor temperature unavailable"
+msgstr "处理器温度不可用"
