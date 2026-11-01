@@ -9,9 +9,27 @@ function text(path) {
 	return value == null ? null : trim(value);
 }
 
+// Standard thermal zone types may also appear as hwmon channel labels.
+// Do not assign numbered TSENS channels to components without a named label.
+function component(name) {
+	name = lc(name ?? '');
+	if (match(name, /^cpu[0-9]*[-_]thermal$/))
+		return 'cpu';
+	if (match(name, /^nss([0-9]+|[-_]top)?[-_]thermal$/))
+		return 'nss';
+	if (match(name, /^(wcss([-_]phy[ab][0-9]+)?|wifi[0-9]*)[-_]thermal$/))
+		return 'wifi';
+	if (match(name, /^modem[0-9]*([-_]thermal)?$/))
+		return 'modem';
+	return null;
+}
+
 // Display hints only: unknown names never prevent collection.
-function category(name, device) {
-	if (match(device, /\/ieee80211\//))
+function category(name, device, label) {
+	const named = component(label) ?? component(name);
+	if (named)
+		return named;
+	if (match(device, /\/ieee80211\//) || match(name, /^ath(10|11)k_hwmon$/))
 		return 'wifi';
 	if (match(device, /\/mdio_bus\//))
 		return 'ethernet';
@@ -43,7 +61,7 @@ export function discover(root) {
 				continue;
 			const label = text(`${dir}/${channel}_label`);
 			push(sensors, {
-				id: `${device}/${channel}`, path, category: category(name, device),
+				id: `${device}/${channel}`, path, category: category(name, device, label),
 				label: label ? `${name} / ${label}` : `${name} / ${channel}`
 			});
 			found = true;

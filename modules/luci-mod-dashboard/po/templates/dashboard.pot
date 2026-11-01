@@ -260,10 +260,17 @@ msgid "Component"
 msgstr ""
 
 #: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/include/13_temperature.js
-#, javascript-format
-msgid "Sensors: %d"
+msgid "Processor temperature unavailable"
 msgstr ""
 
 #: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/include/13_temperature.js
-msgid "Processor temperature unavailable"
+msgid "NSS"
+msgstr ""
+
+#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/include/13_temperature.js
+msgid "Modem"
+msgstr ""
+
+#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/include/13_temperature.js
+msgid "Wi-Fi, NSS and modem summaries show the highest available temperature for each component."
 msgstr ""

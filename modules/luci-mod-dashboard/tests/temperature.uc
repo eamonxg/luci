@@ -62,10 +62,22 @@ try {
 		[ 'jc42', '', 'other' ], [ 'spd5118', '', 'other' ],
 		[ 'amdgpu', '', 'other' ], [ 'gpu-thermal', '', 'other' ],
 		[ 'nct6775', 'Motherboard', 'other' ], [ 'nct6775', 'DIMM 0', 'other' ],
-		[ 'nct6775', 'AUXTIN0', 'other' ]
+		[ 'nct6775', 'AUXTIN0', 'other' ],
+		[ 'qcom_tsens', 'nss-top-thermal', 'nss' ],
+		[ 'qcom_tsens', 'nss0-thermal', 'nss' ],
+		[ 'qcom_tsens', 'nss1-thermal', 'nss' ],
+		[ 'qcom_tsens', 'wcss-phya0-thermal', 'wifi' ],
+		[ 'qcom_tsens', 'wcss-phyb1-thermal', 'wifi' ],
+		[ 'qcom_tsens', 'cpu0-thermal', 'cpu' ],
+		[ 'qcom_tsens', 'tsens_tz_sensor4', 'other' ],
+		[ 'modem', '', 'modem' ],
+		[ 'qcom_tsens', 'modem-thermal', 'modem' ],
+		[ 'ath10k_hwmon', '', 'wifi' ], [ 'ath11k_hwmon', '', 'wifi' ],
+		[ 'nss-controller', '', 'other' ],
+		[ 'unknown', 'CPU fan', 'other' ]
 	];
 	for (let i, c in cases) {
-		const path = `${extra}/class/hwmon/hwmon${i}`;
+		const path = sprintf('%s/class/hwmon/hwmon%02d', extra, i);
 		file(`${path}/name`, c[0]);
 		file(`${path}/temp1_label`, c[1]);
 		file(`${path}/temp1_input`, '42000');
@@ -75,6 +87,20 @@ try {
 		assert(classified.sensors[i].category == c[2], `Conservative category ${c[0]}`);
 		assert(index(classified.sensors[i].label, c[0]) == 0 && classified.sensors[i].celsius == 42, `Unfiltered sensor ${c[0]} ${c[1]}`);
 	}
+	const zones = [ [ 'nss-top-thermal', 'nss' ], [ 'wcss-phyb0-thermal', 'wifi' ], [ 'modem-thermal', 'modem' ], [ 'tsens_tz_sensor4', 'other' ] ];
+	for (let i, zone in zones) {
+		file(`${extra}/class/thermal/thermal_zone${i}/type`, zone[0]);
+		file(`${extra}/class/thermal/thermal_zone${i}/temp`, '50000');
+	}
+	const thermal = sample(discover(extra)).sensors;
+	for (let i, zone in zones) {
+		const sensor = thermal[length(cases) + i];
+		assert(sensor.category == zone[1] && sensor.label == zone[0] && sensor.celsius == 50, `Thermal component ${zone[0]}`);
+	}
+	const wifi = `${root}/devices/platform/ieee80211/phy0`;
+	dir(wifi);
+	fs.symlink(wifi, `${extra}/class/hwmon/hwmon00/device`);
+	assert(discover(extra)[0].category == 'wifi', 'Wireless device path identifies an otherwise unnamed radio');
 	print('PASS sensor discovery, deduplication, values, failure and channel limit\n');
 
 	const code = fs.readfile('root/usr/share/rpcd/ucode/luci.dashboard-temperature');

@@ -282,10 +282,17 @@ msgid "Component"
 msgstr "部件"
 
 #: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/include/13_temperature.js
-#, javascript-format
-msgid "Sensors: %d"
-msgstr "传感器：%d"
-
-#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/include/13_temperature.js
 msgid "Processor temperature unavailable"
 msgstr "处理器温度不可用"
+
+#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/include/13_temperature.js
+msgid "NSS"
+msgstr "NSS"
+
+#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/include/13_temperature.js
+msgid "Modem"
+msgstr "调制解调器"
+
+#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/include/13_temperature.js
+msgid "Wi-Fi, NSS and modem summaries show the highest available temperature for each component."
+msgstr "Wi-Fi、NSS 和调制解调器摘要分别显示该部件的最高有效温度。"

@@ -14,16 +14,27 @@ function processorSensor(sensors) {
 		const [name, channel = ''] = (sensor.label || '').toLowerCase().split(' / ');
 		if (/^(coretemp|k10temp|k8temp)$/.test(name))
 			return /^(package id [0-9]+|tdie)$/.test(channel) ? 0 : channel == 'tctl' ? 1 : 2;
-		if (/^cpu[0-9]*[-_]thermal$/.test(name))
+		if (sensor.category == 'cpu' || /^cpu[0-9]*[-_]thermal$/.test(name))
 			return 3;
 		return 99;
 	};
 	return sensors.filter(s => rank(s) < 99).sort((a, b) => rank(a) - rank(b) || (a.id || a.label).localeCompare(b.id || b.label, undefined, { numeric: true }))[0];
 }
 
+// A module may expose multiple radios or thermal zones. Keep all channels in
+// details, and summarize the hottest available reading for each component.
+function componentTemperature(sensors, category, label) {
+	const channels = sensors.filter(sensor => sensor.category == category);
+	if (!channels.length)
+		return null;
+	const values = channels.map(sensor => sensor.celsius).filter(Number.isFinite);
+	// Wrap between components, keeping each label and reading together.
+	return '%s\u00a0%s'.format(label, temperature(values.length ? Math.max(...values) : null).replace(' ', '\u00a0'));
+}
+
 return baseclass.extend({
 	widgets: [
-		{ id: 'temperature', slot: 'cards', title: _('CPU temperature'), order: 40 },
+		{ id: 'temperature', slot: 'cards', title: _('Temperature'), order: 40 },
 		{ id: 'temperatures', slot: 'tabs', title: _('Temperatures'), order: 40 }
 	],
 
@@ -34,23 +45,36 @@ return baseclass.extend({
 	render(data) {
 		const sensors = Array.isArray(data.sensors) ? data.sensors : [];
 		const categories = {
-			cpu: _('CPU'), soc: _('SoC'), wifi: _('Wi-Fi'),
+			cpu: _('CPU'), soc: _('SoC'), wifi: _('Wi-Fi'), nss: _('NSS'), modem: _('Modem'),
 			ethernet: _('Ethernet PHY'), storage: _('Storage'), other: _('Other sensors')
 		};
 		const processor = processorSensor(sensors);
 		const value = processor?.celsius;
 		const message = data.status == 'unsupported' ? _('No supported temperature sensors found') : _('Temperature temporarily unavailable');
 		const stale = data.age_ms >= 15000;
-		const sub = [ !processor ? _('Processor temperature unavailable') : !Number.isFinite(value) ? message
-			: stale ? _('Reading age: %d seconds').format(Math.floor(data.age_ms / 1000)) : _('Sensors: %d').format(sensors.length) ];
+		const modules = ['nss', 'wifi', 'modem'].map(category => componentTemperature(sensors, category, categories[category])).filter(Boolean);
+		const cpuOnly = processor && !modules.length;
+		const sub = [];
+		for (let i = 0; i < modules.length; i += 2)
+			sub.push(modules.slice(i, i + 2).join(' · '));
+		if (!processor)
+			sub.push(_('Processor temperature unavailable'));
+		else if (!Number.isFinite(value))
+			sub.push(message);
+		if (stale)
+			sub.push(_('Reading age: %d seconds').format(Math.floor(data.age_ms / 1000)));
 
 		return {
 			cards: data.status == 'unsupported' ? [] : [{
-				id: 'temperature', node: () => charts.kpi({ icon: 'temperature', title: _('CPU temperature'), value: [ temperature(value) ], sub })
+				id: 'temperature', node: () => charts.kpi({
+					icon: 'temperature', title: cpuOnly ? _('CPU temperature') : _('Temperature'), className: 'dashboard-temperature',
+					value: [ cpuOnly ? temperature(value) : '%s %s'.format(_('CPU'), temperature(value)) ], sub, stacked: true
+				})
 			}],
 			tabs: data.status == 'unsupported' ? [] : [{ id: 'temperatures', title: _('Temperatures'), content: () => E('div', {}, [
 				stale ? E('p', {}, [ _('Reading age: %d seconds').format(Math.floor(data.age_ms / 1000)) ]) : '',
 				data.status == 'partial' ? E('p', {}, [ _('Some temperature sensors are unavailable') ]) : '',
+				modules.length ? E('p', {}, [ _('Wi-Fi, NSS and modem summaries show the highest available temperature for each component.') ]) : '',
 				sensors.length ? E('table', { 'class': 'table' }, [
 					E('tr', { 'class': 'tr table-titles' }, [
 						E('th', { 'class': 'th' }, [ _('Component') ]),

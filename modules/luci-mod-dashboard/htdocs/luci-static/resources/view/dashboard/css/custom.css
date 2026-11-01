@@ -145,6 +145,11 @@
 	white-space: nowrap;
 }
 
+/* Keep every component reading visible when a temperature card narrows. */
+.dashboard-temperature .dashboard-kpi-line {
+	white-space: normal;
+}
+
 /* ---- Donut ---- */
 /* Shorter than the bar charts it shares a row with, so centre it. */
 .dashboard-donut {
