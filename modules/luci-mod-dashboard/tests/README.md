@@ -74,14 +74,14 @@ exposed by these standard interfaces; unknown sensor names are equally valid.
 Absent channels are not listed. Existing channels that fail show an unavailable
 value, so failure is not confused with missing hardware.
 
-The card is titled Temperature when it includes Wi-Fi, NSS or modem summaries,
-with the CPU reading as its primary value. Only discovered components appear.
+The card is always titled Temperature, with a CPU-labelled reading as its primary
+value. Only discovered Wi-Fi, NSS or modem components appear in secondary lines.
 Each secondary summary shows that component's highest valid reading; failed
 components show an unavailable value. The details table retains every sensor,
 its original name, category and reading, and explains the summary rule.
 
-Without those secondary components, a recognized CPU uses the title CPU
-temperature and a plain temperature value, without a sensor-count subtitle.
+Without those secondary components, the same title and CPU-labelled reading
+remain, with no secondary line or sensor-count subtitle for a healthy reading.
 A small frontend selector prefers explicit Intel package/AMD die readings, then
 CPU thermal channels identified by their name or backend category. Generic SoC
 channels remain in details and are not relabelled as CPU. Unknown channels are

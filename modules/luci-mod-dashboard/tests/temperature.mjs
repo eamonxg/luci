@@ -56,17 +56,17 @@ test('Intel package, AMD die and ARM CPU readings, including failed primary', ()
 		const card = value => widget.render({ status: 'ok', age_ms: 5000, sensors: [
 			{ label: 'nvme / Composite', celsius: 90 }, { label, celsius: value }
 		] }).cards[0].node();
-		assert.equal(card(0).value[0], '0.0 °C');
-		assert.equal(card(-1).value[0], '-1.0 °C');
-		assert.equal(card(null).value[0], '—');
+		assert.equal(card(0).value[0], 'CPU 0.0 °C');
+		assert.equal(card(-1).value[0], 'CPU -1.0 °C');
+		assert.equal(card(null).value[0], 'CPU —');
 		assert.equal(card(40).sub.length, 0);
-		assert.equal(card(40).title, 'CPU temperature');
+		assert.equal(card(40).title, 'Temperature');
 	}
 	const output = widget.render({ status: 'ok', sensors: [
 		{ label: 'coretemp / Core 0', celsius: 60 },
 		{ label: 'coretemp / Package id 0', celsius: 50 }
 	] }).cards[0].node();
-	assert.equal(output.value[0], '50.0 °C');
+	assert.equal(output.value[0], 'CPU 50.0 °C');
 });
 
 
@@ -92,7 +92,7 @@ test('Non-finite readings are unavailable and unknown categories remain visible'
 			{ label: 'cpu-thermal', celsius: value },
 			{ category: 'future-driver', label: 'new-driver / temp1', celsius: 42 }
 		] });
-		assert.equal(sections.cards[0].node().value[0], '—');
+		assert.equal(sections.cards[0].node().value[0], 'CPU —');
 		const details = JSON.stringify(sections.tabs[0].content());
 		assert.match(details, /Other sensors/);
 		assert.match(details, /new-driver \/ temp1/);
@@ -147,13 +147,20 @@ test('CPU channels labelled by a shared hwmon driver can supply the primary read
 	assert.equal(sections.cards[0].node().value[0], 'CPU 60.0 °C');
 });
 
-test('CPU-only cards have a specific title, a plain reading and no sensor-count filler', () => {
-	const card = widget.render({ status: 'ok', sensors: [
-		{ category: 'cpu', label: 'cpu0-thermal', celsius: 67 }
-	] }).cards[0].node();
-	assert.equal(card.title, 'CPU temperature');
-	assert.deepEqual(Array.from(card.value), ['67.0 °C']);
-	assert.deepEqual(Array.from(card.sub), []);
+test('Card title and CPU reading stay consistent across all optional component combinations', () => {
+	const optional = ['nss', 'wifi', 'modem'];
+	for (let mask = 0; mask < 8; mask++) {
+		const sensors = [ { category: 'cpu', label: 'cpu0-thermal', celsius: 67 } ];
+		optional.forEach((category, i) => {
+			if (mask & (1 << i))
+				sensors.push({ category, label: category + '-thermal', celsius: 50 });
+		});
+		const card = widget.render({ status: 'ok', sensors }).cards[0].node();
+		assert.equal(card.title, 'Temperature');
+		assert.deepEqual(Array.from(card.value), ['CPU 67.0 °C']);
+		assert.equal(card.sub.length, Math.ceil((sensors.length - 1) / 2));
+		assert.doesNotMatch(summary(card).join(' '), /Sensors:/);
+	}
 });
 
 test('Temperature widgets integrate with dashboard defaults and independent layout controls', async () => {

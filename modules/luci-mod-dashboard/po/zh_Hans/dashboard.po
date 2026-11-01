@@ -262,10 +262,6 @@ msgid "Sensor"
 msgstr "传感器"
 
 #: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/include/13_temperature.js
-msgid "CPU temperature"
-msgstr "CPU 温度"
-
-#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/include/13_temperature.js
 msgid "SoC"
 msgstr "SoC"
 

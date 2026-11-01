@@ -53,7 +53,6 @@ return baseclass.extend({
 		const message = data.status == 'unsupported' ? _('No supported temperature sensors found') : _('Temperature temporarily unavailable');
 		const stale = data.age_ms >= 15000;
 		const modules = ['nss', 'wifi', 'modem'].map(category => componentTemperature(sensors, category, categories[category])).filter(Boolean);
-		const cpuOnly = processor && !modules.length;
 		const sub = [];
 		for (let i = 0; i < modules.length; i += 2)
 			sub.push(modules.slice(i, i + 2).join(' · '));
@@ -67,8 +66,8 @@ return baseclass.extend({
 		return {
 			cards: data.status == 'unsupported' ? [] : [{
 				id: 'temperature', node: () => charts.kpi({
-					icon: 'temperature', title: cpuOnly ? _('CPU temperature') : _('Temperature'), className: 'dashboard-temperature',
-					value: [ cpuOnly ? temperature(value) : '%s %s'.format(_('CPU'), temperature(value)) ], sub, stacked: true
+					icon: 'temperature', title: _('Temperature'), className: 'dashboard-temperature',
+					value: [ '%s %s'.format(_('CPU'), temperature(value)) ], sub, stacked: true
 				})
 			}],
 			tabs: data.status == 'unsupported' ? [] : [{ id: 'temperatures', title: _('Temperatures'), content: () => E('div', {}, [

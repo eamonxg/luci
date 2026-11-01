@@ -240,10 +240,6 @@ msgid "Sensor"
 msgstr ""
 
 #: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/include/13_temperature.js
-msgid "CPU temperature"
-msgstr ""
-
-#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/include/13_temperature.js
 msgid "SoC"
 msgstr ""
 
