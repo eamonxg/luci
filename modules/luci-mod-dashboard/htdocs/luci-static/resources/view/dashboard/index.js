@@ -19,13 +19,16 @@ const ROWS = {
 function invokeIncludesLoad(includes, layout) {
 	const tasks = [];
 	let has_load = false;
+	const selected = include => !include.widgets?.length || include.widgets.some(widget => layout[widget.slot]?.includes(widget.id));
+	const requiredSources = new Set(includes.filter(selected).flatMap(include => include.dataSources || []));
 
 	for (let i = 0; i < includes.length; i++) {
 		const declared = includes[i].widgets || [];
 
 		includes[i].failed = false;
+		includes[i].topologyEnabled = layout.charts.includes('network_path_preview');
 
-		includes[i].skipped = (declared.length > 0 && !declared.some(widget => layout[widget.slot]?.includes(widget.id)));
+		includes[i].skipped = declared.length > 0 && !selected(includes[i]) && !requiredSources.has(includes[i].topologySource);
 
 		if (includes[i].skipped) {
 			tasks.push(null);
@@ -88,6 +91,7 @@ function collectSections(includes, results, layout) {
 		}
 		catch (e) {
 			console.error(e);
+			includes[i].failed = true;
 			continue;
 		}
 	}
@@ -257,41 +261,67 @@ function startPolling(includes, layout, root, form) {
 		tabs: tabMap,
 		extra: extraContainer
 	};
-	let returnSource = null;
 	const headerOffset = () => {
 		const header = document.querySelector('header');
 		return header && [ 'fixed', 'sticky' ].includes(getComputedStyle(header).position)
 			? Math.max(0, header.getBoundingClientRect().bottom) : 0;
 	};
-	const updateReturnLinks = () => {
-		root.querySelectorAll('[data-dashboard-return]').forEach(link => {
-			link.hidden = !returnSource?.isConnected;
-		});
+	// Themes may scroll the content pane instead of the browser window.
+	// Resolve it only on navigation, never in the polling loop.
+	const scrollFrame = target => {
+		for (let parent = target.parentElement; parent && parent !== document.body; parent = parent.parentElement) {
+			if (/^(auto|scroll)$/.test(getComputedStyle(parent).overflowY) && parent.scrollHeight > parent.clientHeight) {
+				const rect = parent.getBoundingClientRect();
+				return { node: parent, top: Math.max(headerOffset(), rect.top), bottom: Math.min(window.innerHeight, rect.bottom) };
+			}
+		}
+		return { node: window, top: headerOffset(), bottom: window.innerHeight };
 	};
-	root.addEventListener('dashboard-client-filter', ev => {
-		root.querySelectorAll('[data-dashboard-tab="wifi"]').forEach(link => {
-			const selected = !!ev.detail.network && link.dataset.dashboardNetwork === ev.detail.network;
-			if (selected) {
-				link.setAttribute('aria-current', 'true');
-				if (returnSource)
-					returnSource = link;
-			}
-			else {
-				link.removeAttribute('aria-current');
-			}
+	const scrollToTarget = (frame, top) => {
+		const offset = frame.node === window ? window.scrollY : frame.node.scrollTop;
+		frame.node.scrollTo({ top: Math.max(0, offset + top - frame.top - 16), behavior: 'auto' });
+	};
+	const topologyTarget = ({ network, client }) => Array.from(root.querySelectorAll('[data-dashboard-overview] [data-dashboard-tab="wifi"]'))
+		.find(link => (link.dataset.dashboardNetwork || null) === (network || null) &&
+			(link.dataset.dashboardClient || null) === (client || null));
+	const showTopology = location => {
+		const overview = root.querySelector('[data-dashboard-overview]');
+		if (!overview)
+			return;
+		overview.dispatchEvent(new CustomEvent('dashboard-topology-reveal', { detail: location || {} }));
+		const target = topologyTarget(location);
+		if (target?.isConnected)
+			target.focus({ preventScroll: true });
+		const frame = scrollFrame(target?.isConnected ? target : overview);
+		const overviewRect = overview.getBoundingClientRect();
+		const targetRect = target?.isConnected ? target.getBoundingClientRect() : null;
+		// Preserve the overview context only when the requested node fits below it.
+		const fits = !targetRect || targetRect.bottom - overviewRect.top <= frame.bottom - frame.top - 32;
+		scrollToTarget(frame, fits ? overviewRect.top : targetRect.top);
+	};
+	root.addEventListener('dashboard-client-selection', ev => {
+		const location = {
+			tab: 'wifi', network: ev.detail.network || null,
+			client: ev.detail.client ? String(ev.detail.client).toUpperCase() : null
+		};
+		root.querySelectorAll('[data-dashboard-overview]').forEach(overview => {
+			overview.dispatchEvent(new CustomEvent('dashboard-topology-selection', { detail: location }));
 		});
 	});
 
 	// Widgets declare destinations; the shell owns native LuCI tab activation.
 	// Use the tab's own click handler so its state and events stay in sync.
 	root.addEventListener('click', ev => {
-		if (ev.target.closest('[data-dashboard-return]')) {
+		const locator = ev.target.closest('[data-dashboard-locate]');
+		if (locator && root.contains(locator)) {
 			ev.preventDefault();
-			if (returnSource?.isConnected) {
-				returnSource.focus({ preventScroll: true });
-				const overview = returnSource.closest('[data-dashboard-overview]') || returnSource;
-				window.scrollTo({ top: Math.max(0, window.scrollY + overview.getBoundingClientRect().top - headerOffset() - 16), behavior: 'auto' });
-			}
+			const location = {
+				tab: 'wifi', network: locator.dataset.dashboardNetwork || null,
+				client: String(locator.dataset.dashboardLocate).toUpperCase()
+			};
+			const owner = includes.find(include => include.widgets?.some(widget => widget.slot == 'tabs' && widget.id == 'wifi'));
+			owner?.selectClient?.(location);
+			showTopology(location);
 			return;
 		}
 		const source = ev.target.closest('[data-dashboard-tab]');
@@ -304,20 +334,28 @@ function startPolling(includes, layout, root, form) {
 		const pane = Array.from(tabGroup.children).find(node => node.dataset.tab == id);
 		if (!tab || !pane)
 			return;
-		if (source.closest('[data-dashboard-overview]'))
-			returnSource = source;
+		const destination = {
+			network: source.dataset.dashboardNetwork || null,
+			client: source.dataset.dashboardClient ? source.dataset.dashboardClient.toUpperCase() : null
+		};
+		if (id !== 'wifi')
+			source.closest('[data-dashboard-overview]')?.dispatchEvent(new CustomEvent('dashboard-topology-selection', {
+				detail: Object.assign({ tab: id }, destination)
+			}));
 		tab.click();
 		const owner = includes.find(include => include.widgets?.some(widget => widget.slot == 'tabs' && widget.id == id));
-		owner?.navigate?.({ network: source.dataset.dashboardNetwork || null });
-		updateReturnLinks();
+		owner?.navigate?.(destination);
 		const section = Array.from(pane.querySelectorAll('[data-dashboard-section]'))
 			.find(node => node.dataset.dashboardSection == source.dataset.dashboardSection);
-		const target = section || pane;
+		const row = (destination.client || destination.network) ? Array.from(pane.querySelectorAll('[data-dashboard-client-row]'))
+			.find(node => (!destination.client || node.dataset.dashboardClientRow === destination.client) &&
+				(!destination.network || node.dataset.dashboardNetwork === destination.network)) : null;
+		const target = row || section || pane;
 		target.tabIndex = -1;
 		target.focus({ preventScroll: true });
 		// Keep the tab bar in view when the section fits; on a narrow screen,
 		// scroll straight to the requested list instead of stopping at cards.
-		const headerBottom = headerOffset();
+		const frame = scrollFrame(target);
 		const menu = tabMap.querySelector('.cbi-tabmenu');
 		// Keep the active destination visible in horizontally scrolling themes.
 		const menuRect = menu.getBoundingClientRect();
@@ -326,9 +364,9 @@ function startPolling(includes, layout, root, form) {
 			menu.scrollLeft += tabRect.left - menuRect.left - (menu.clientWidth - tabRect.width) / 2;
 		const menuTop = menu.getBoundingClientRect().top;
 		const rect = target.getBoundingClientRect();
-		const fits = rect.bottom - menuTop <= window.innerHeight - headerBottom - 32;
-		const top = section && !fits ? rect.top : menuTop;
-		window.scrollTo({ top: Math.max(0, window.scrollY + top - headerBottom - 16), behavior: 'auto' });
+		const fits = rect.bottom - menuTop <= frame.bottom - frame.top - 32;
+		const top = (row || section) && !fits ? rect.top : menuTop;
+		scrollToTarget(frame, top);
 	});
 
 	const step = () => {
@@ -336,6 +374,15 @@ function startPolling(includes, layout, root, form) {
 			return invokeIncludesLoad(includes, layout);
 		}).then(results => {
 			const sections = collectSections(includes, results, layout);
+			const consumers = includes.filter(include => !include.failed && !include.skipped && include.updateTopology);
+			if (consumers.length) {
+				const snapshot = {};
+				includes.forEach(include => {
+					if (!include.failed && !include.skipped && include.topologySource)
+						snapshot[include.topologySource] = include.getTopologyData();
+				});
+				consumers.forEach(include => include.updateTopology(snapshot));
+			}
 
 			if (form)
 				sections.tabs.push({ id: 'layout', title: _('Settings'), content: [] });
@@ -356,7 +403,6 @@ function startPolling(includes, layout, root, form) {
 				link.disabled = !available;
 				link.title = available ? '' : _('Enable this detail tab in Settings to view it.');
 			});
-			updateReturnLinks();
 
 			if (sections.extra.length)
 				L.dom.content(extraContainer, sections.extra);

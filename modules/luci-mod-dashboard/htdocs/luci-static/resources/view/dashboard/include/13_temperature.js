@@ -193,7 +193,7 @@ return baseclass.extend({
 				const widget = new ui.Select(L.toArray(cfgvalue), this.transformChoices(), {
 					id: this.cbid(section_id), sort: this.keylist, multiple: true,
 					widget: 'checkbox', orientation: 'vertical',
-					validate: this.getValidator(section_id), disabled: this.map.readonly
+					validate: value => this.validate(section_id, value), disabled: this.map.readonly
 				});
 				// ui.Select renders checkboxes but its default accessors handle radios.
 				widget.getValue = function() {
