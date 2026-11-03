@@ -73,7 +73,6 @@ return baseclass.extend({
 			tabs: data.status == 'unsupported' ? [] : [{ id: 'temperatures', title: _('Temperatures'), content: () => E('div', {}, [
 				stale ? E('p', {}, [ _('Reading age: %d seconds').format(Math.floor(data.age_ms / 1000)) ]) : '',
 				data.status == 'partial' ? E('p', {}, [ _('Some temperature sensors are unavailable') ]) : '',
-				modules.length ? E('p', {}, [ _('Wi-Fi, NSS and modem summaries show the highest available temperature for each component.') ]) : '',
 				sensors.length ? E('table', { 'class': 'table' }, [
 					E('tr', { 'class': 'tr table-titles' }, [
 						E('th', { 'class': 'th' }, [ _('Component') ]),
