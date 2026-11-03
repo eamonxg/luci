@@ -26,6 +26,7 @@ function rssiOf(device) {
 return baseclass.extend({
 
 	title: _('Wireless'),
+	topologySource: 'wifi',
 
 	params: [],
 
@@ -208,42 +209,126 @@ return baseclass.extend({
 		]);
 	},
 
+	getTopologyData() {
+		if (!this.params.wifi)
+			return null;
+
+		const radios = this.params.wifi.radios.filter(radio => radio.mode === 'ap' || radio.mode === 'ap-wds');
+		const networks = new Set(radios.map(radio => radio.network));
+		return {
+			networks: radios.map(radio => ({
+				id: radio.network,
+				name: radio.ssid.value,
+				band: radio.band,
+				mode: radio.mode,
+				active: radio.isactive.value,
+				channel: radio.chan.value
+			})),
+			clients: this.params.wifi.devices.filter(device => networks.has(device.network)).map(device => ({
+				network: device.network,
+				mac: device.mac,
+				name: device.hostname.value && device.hostname.value !== '?' ? device.hostname.value : device.mac,
+				addresses: device.addresses.value,
+				signal: device.signal.value.rssi
+			}))
+		};
+	},
+
 	renderClientTable() {
+		const devices = this.params.wifi.devices;
+		const locateNetworks = this.topologyEnabled ? new Set(this.params.wifi.radios
+			.filter(radio => radio.mode === 'ap' || radio.mode === 'ap-wds')
+			.map(radio => radio.network)) : null;
+		const clientName = device => device.hostname.value && device.hostname.value !== '?' ? device.hostname.value : device.mac;
+		const selected = device => !!this.selectedNetwork && device.network === this.selectedNetwork &&
+			(!this.selectedClient || device.mac === this.selectedClient);
+		const stack = (primary, secondary) => E('div', { 'class': 'dashboard-client-stack' }, [
+			E('div', { 'class': 'dashboard-client-primary' }, [ primary ]),
+			secondary ? E('div', { 'class': 'dashboard-client-secondary' }, [ secondary ]) : ''
+		]);
+
 		return charts.table({
 			id: 'dashboard-wifi-table',
 			head: [
-				_('Hostname'),
-				_('IP Address'),
-				_('SSID'),
-				_('Band'),
-				'%s / %s'.format(_('Signal'), _('Noise floor')),
-				'%s / %s'.format(_('Up.'), _('Down.')),
+				_('Device'),
+				_('Network'),
+				_('Signal'),
+				_('Transferred'),
 				_('Connected')
 			],
-			rows: this.params.wifi.devices.map(device => [
-				device.hostname.value,
-				device.addresses.value.length
-					? E('div', { 'class': 'dashboard-client-addresses' }, device.addresses.value.map(address => E('div', {}, [ address ])))
-					: '-',
-				device.ssid.value,
-				device.band.value || '-',
-				E('span', {}, [
+			rowKeys: devices.map(device => device.network + '/' + device.mac),
+			rowAttrs: devices.map(device => ({
+				'data-dashboard-client-row': device.mac,
+				'data-dashboard-network': device.network,
+				'class': selected(device) ? 'dashboard-client-located' : '',
+				'aria-current': selected(device) ? 'true' : null
+			})),
+			rows: devices.map(device => [
+				stack(locateNetworks?.has(device.network) ? E('button', {
+					type: 'button', 'class': 'dashboard-client-locate',
+					'data-dashboard-locate': device.mac,
+					'data-dashboard-network': device.network,
+					'aria-label': _('Locate %s in network topology').format(clientName(device))
+				}, clientName(device)) : clientName(device),
+					device.addresses.value.length
+						? E('div', { 'class': 'dashboard-client-addresses' }, device.addresses.value.map(address => E('div', {}, [ address ])))
+						: '-'),
+				stack(device.ssid.value, device.band.value || '-'),
+				stack(
 					charts.badge((device.signal.value.rssi != null) ? '%d %s'.format(device.signal.value.rssi, _('dBm')) : _('No RX signal'), signalGrade(device.signal.value.rssi).kind),
-					' ',
 					(device.signal.value.noise != null)
-						? E('small', {}, [ '/ %d %s'.format(device.signal.value.noise, _('dBm')) ])
-						: ''
-				]),
-				E('span', {}, [
-					E('span', { 'title': _('Up.') }, [ device.transferred.value.rx ]),
-					' / ',
-					E('span', { 'title': _('Down.') }, [ device.transferred.value.tx ])
+						? '%s: %d %s'.format(_('Noise floor'), device.signal.value.noise, _('dBm'))
+						: null),
+				E('div', { 'class': 'dashboard-client-stack dashboard-client-transfer' }, [
+					E('span', { 'title': _('Download'), 'aria-label': '%s: %s'.format(_('Download'), device.transferred.value.tx) }, [ '↓ ', device.transferred.value.tx ]),
+					E('span', { 'title': _('Upload'), 'aria-label': '%s: %s'.format(_('Upload'), device.transferred.value.rx) }, [ '↑ ', device.transferred.value.rx ])
 				]),
 				device.connected.value || '-'
 			]),
-			emptyText: _('No wireless clients connected'),
-			foot: [ _('Total'), String(this.params.wifi.devices.length) ]
+			emptyText: _('No wireless clients connected')
 		});
+	},
+
+	navigate(selection) {
+		this.selectClient(selection);
+	},
+
+	selectClient({ network, client }) {
+		this.selectedClient = client ? String(client).toUpperCase() : null;
+		this.selectedNetwork = network || (this.selectedClient
+			? this.params.wifi.devices.find(device => device.mac === this.selectedClient)?.network : null) || null;
+		this.clearStaleSelection();
+		this.renderClientTable();
+		this.notifyClientSelection();
+	},
+
+	clearStaleSelection() {
+		const present = this.selectedClient
+			? this.params.wifi.devices.some(device => device.mac === this.selectedClient && device.network === this.selectedNetwork)
+			: !this.selectedNetwork || this.params.wifi.radios.some(radio => radio.network === this.selectedNetwork);
+		if (present)
+			return false;
+		this.selectedClient = null;
+		this.selectedNetwork = null;
+		return true;
+	},
+
+	notifyClientSelection() {
+		this.tabNode?.dispatchEvent(new CustomEvent('dashboard-client-selection', {
+			bubbles: true, detail: {
+				network: this.selectedNetwork || null,
+				client: this.selectedClient || null
+			}
+		}));
+	},
+
+	updateClientSummary() {
+		const text = String(this.params.wifi.devices.length);
+		if (this.clientCount.textContent !== text)
+			this.clientCount.textContent = text;
+		const summary = _('Wireless networks (%d)').format(this.params.wifi.radios.length);
+		if (this.networkSummary.textContent !== summary)
+			this.networkSummary.textContent = summary;
 	},
 
 	frequencyBand(frequency) {
@@ -279,15 +364,23 @@ return baseclass.extend({
 		if (this.tabNode && this.tabNode.parentNode) {
 			const oldGrid = this.tabNode.querySelector('.dashboard-net-grid');
 			if (oldGrid)
-				this.tabNode.replaceChild(netGrid, oldGrid);
+				oldGrid.replaceWith(netGrid);
+			this.updateClientSummary();
 			return this.tabNode;
 		}
 
+		this.clientCount = E('span', { 'class': 'dashboard-client-count', 'role': 'status' });
+		this.networkSummary = E('summary');
 		this.tabNode = E('div', {}, [
-			netGrid,
-			E('h3', {}, [ _('Wireless clients') ]),
-			clientTable
+			E('div', { 'data-dashboard-section': 'clients' }, [
+				E('div', { 'class': 'dashboard-client-heading' }, [
+					E('h3', {}, [ _('Wireless clients'), this.clientCount ])
+				]),
+				clientTable
+			]),
+			E('details', { 'class': 'dashboard-network-details' }, [ this.networkSummary, netGrid ])
 		]);
+		this.updateClientSummary();
 
 		return this.tabNode;
 	},
@@ -312,6 +405,9 @@ return baseclass.extend({
 
 				this.params.wifi.radios.push(
 					{
+						network: net.getIfname() || net.getName(),
+						mode: net.getMode(),
+						band: this.frequencyBand(freq),
 						ssid : {
 							title: _('SSID'),
 							visible: true,
@@ -368,6 +464,8 @@ return baseclass.extend({
 
 				this.params.wifi.devices.push(
 					{
+						network: networks[i].getIfname() || networks[i].getName(),
+						mac,
 						band : {
 							title: _('Band'),
 							visible: true,
@@ -433,6 +531,8 @@ return baseclass.extend({
 		};
 
 		this.renderUpdateData(radios, networks, hosthints);
+		if (this.clearStaleSelection())
+			this.notifyClientSelection();
 
 		if (!this.params.wifi.radios.length)
 			return null;

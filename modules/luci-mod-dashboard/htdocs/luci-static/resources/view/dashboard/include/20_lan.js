@@ -66,7 +66,7 @@ return baseclass.extend({
 	},
 
 	render([leases]) {
-		this.renderUpdateData([...leases.dhcp_leases]);
+		this.renderUpdateData(Array.isArray(leases?.dhcp_leases) ? leases.dhcp_leases : []);
 
 		return {
 			cards: [ { id: 'dhcp', node: () => this.renderKpi() } ],

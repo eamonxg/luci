@@ -16,6 +16,7 @@ var callGetUnixtime = rpc.declare({
 return baseclass.extend({
 
 	params: [],
+	topologySource: 'router',
 
 	widgets: [
 		{ id: 'internet', slot: 'cards', title: _('Internet'), order: 10 },
@@ -269,6 +270,13 @@ return baseclass.extend({
 				timeZone: zn
 			}).format(date);
 		}
+		else if (systeminfo.localtime) {
+			// OpenWrt 24.10 reports an already timezone-adjusted wall clock.
+			const date = new Date(systeminfo.localtime * 1000);
+			datestr = '%04d-%02d-%02d %02d:%02d:%02d'.format(
+				date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate(),
+				date.getUTCHours(), date.getUTCMinutes(), date.getUTCSeconds());
+		}
 
 		this.params.router = {
 			uptime: {
@@ -303,9 +311,48 @@ return baseclass.extend({
 		};
 	},
 
+	// Reuse the same WAN and board snapshot as the detail tabs. "up" is the
+	// interface state; it does not prove Internet reachability.
+	updateTopologyData(data) {
+		const board = data[2] || {};
+		const upstreams = [];
+
+		for (const family of [ 4, 6 ]) {
+			for (const net of data[family === 4 ? 0 : 1] || []) {
+				const name = net.getName();
+				if (upstreams.some(item => item.family === family && item.network === name))
+					continue;
+				const gateway = family === 4 ? net.getGatewayAddr() : net.getGateway6Addr();
+				const device = net.getL3Device();
+				upstreams.push({
+					id: family + ':' + name,
+					family,
+					network: name,
+					device: device ? device.getName() : null,
+					gateway: gateway && gateway !== '0.0.0.0' && gateway !== '::' ? gateway : null,
+					addresses: (family === 4 ? net.getIPAddrs() : net.getIP6Addrs()).map(address => address.split('/')[0]),
+					up: net.isUp()
+				});
+			}
+		}
+
+		this.topology = {
+			hostname: board.hostname || null,
+			model: board.model || null,
+			// This is the endpoint being managed, not an inferred LAN interface.
+			managementAddress: window.location.hostname.replace(/^\[|\]$/g, '') || null,
+			upstreams
+		};
+	},
+
+	getTopologyData() {
+		return this.topology || null;
+	},
+
 	render(data) {
 		this.renderInternetBox(data);
 		this.renderRouterBox(data);
+		this.updateTopologyData(data);
 
 		return {
 			cards: [

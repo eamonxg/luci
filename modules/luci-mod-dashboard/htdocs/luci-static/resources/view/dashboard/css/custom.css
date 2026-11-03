@@ -22,6 +22,7 @@
 	--dashboard-series-7: #b0367c;
 	--dashboard-series-8: #9c9a1c;
 	--dashboard-gap: 16px;
+	--dashboard-extra-lightness: 42%;
 
 	display: grid;
 	/* minmax(0, …): a wide tab menu must scroll, not widen every row. */
@@ -31,6 +32,7 @@
 }
 
 [data-darkmode="true"] .Dashboard {
+	--dashboard-extra-lightness: 65%;
 	--dashboard-surface-alt: var(--background-color-medium, #262b34);
 	--dashboard-text: var(--text-color-high, #e6e8eb);
 	--dashboard-text-muted: var(--text-color-high, #9aa3ad);
@@ -44,6 +46,7 @@
 
 @media (prefers-color-scheme: dark) {
 	:root:not([data-darkmode="false"]) .Dashboard {
+		--dashboard-extra-lightness: 65%;
 		--dashboard-surface-alt: var(--background-color-medium, #262b34);
 		--dashboard-text: var(--text-color-high, #e6e8eb);
 		--dashboard-text-muted: var(--text-color-high, #9aa3ad);
@@ -57,6 +60,102 @@
 }
 
 /* ---- Layout ---- */
+.dashboard-client-heading {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin-bottom: 12px;
+}
+
+.Dashboard .dashboard-client-heading > h3 {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	margin: 0;
+	padding: 0;
+	border: 0;
+}
+
+.dashboard-client-count {
+	font-size: 12px;
+	font-weight: normal;
+	color: var(--dashboard-text-muted);
+}
+
+.dashboard-network-details { margin-top: 16px; border-top: 1px solid var(--dashboard-border); }
+.dashboard-network-details > summary { padding: 12px 0; cursor: pointer; font-weight: bold; }
+
+.Dashboard [data-dashboard-section]:focus,
+.Dashboard [data-tab]:focus {
+	outline: none;
+}
+
+.dashboard-settings .dashboard-widget-list {
+	display: flex;
+	flex-direction: column;
+	width: 100%;
+	max-width: none;
+}
+
+.dashboard-settings .dashboard-widget-list > .item,
+.dashboard-settings .dashboard-widget-list > .add-item,
+.dashboard-settings .dashboard-widget-list > .add-item > .cbi-dropdown {
+	box-sizing: border-box;
+	width: 100%;
+	max-width: none;
+}
+
+.dashboard-widget-list.dashboard-sorting > .item * {
+	pointer-events: none;
+}
+
+.dashboard-settings .dashboard-configurable::after {
+	bottom: auto;
+	height: 28px;
+}
+
+.dashboard-widget-settings > summary {
+	cursor: pointer;
+	padding: 2px 0;
+}
+
+.dashboard-widget-options {
+	margin: 12px 0 6px 12px;
+	padding-left: 12px;
+	cursor: default;
+	word-break: normal;
+	overflow-wrap: anywhere;
+}
+
+.dashboard-widget-options .cbi-value-title {
+	display: none;
+}
+
+.dashboard-widget-options .cbi-value-field {
+	margin-left: 0;
+	min-width: 0;
+}
+
+.dashboard-widget-options .cbi-value {
+	padding: 0;
+}
+
+.dashboard-sensor-choice {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 3px 0 3px 6px;
+}
+
+.dashboard-sensor-choice > i {
+	display: inline-block;
+	width: 9px;
+	height: 9px;
+	border-radius: 2px;
+}
+
 /* Every row fills the width: an item's basis is its row's share, set from
    --dashboard-per-row, and flex-grow takes up the rest. On narrow screens
    the min-width wraps the items, which still fill their rows. */
@@ -82,6 +181,28 @@
 	min-width: 250px;
 }
 
+/* All charts share one compact header; keep the plotting area aligned even
+   when a source has no metadata. Card surfaces and heading fonts stay themed. */
+.Dashboard .dashboard-chart > h3 {
+	margin: 0 0 4px;
+	padding: 0;
+	border: 0;
+	line-height: 1.4;
+}
+
+.Dashboard .dashboard-chart > .cbi-section-descr {
+	min-height: 1.4em;
+	margin: 0 0 16px;
+	padding: 0;
+	font-size: 12px;
+	line-height: 1.4;
+	color: var(--dashboard-text-muted);
+}
+
+.dashboard-chart > em:empty {
+	display: none;
+}
+
 /* ---- Icon (mask keeps the SVG files, colour follows the theme) ---- */
 .dashboard-icon {
 	display: inline-block;
@@ -99,20 +220,26 @@
 	gap: 14px;
 }
 
-.dashboard-kpi-icon {
+/* KPI and topology use one icon treatment; only the slot size differs. */
+.dashboard-kpi-icon,
+.dashboard-topology-icon {
 	flex-shrink: 0;
-	width: 56px;
-	height: 56px;
-	border-radius: 14px;
+	width: var(--dashboard-icon-size, 56px);
+	height: var(--dashboard-icon-size, 56px);
+	border-radius: 25%;
 	background: var(--dashboard-surface-alt);
 	color: var(--dashboard-primary);
 	position: relative;
 }
 
-.dashboard-kpi-icon::after {
+.dashboard-kpi-icon::after,
+.dashboard-topology-icon::after {
 	content: "";
 	position: absolute;
-	inset: 13px;
+	inset: 0;
+	margin: auto;
+	width: var(--dashboard-icon-glyph-size, 28px);
+	height: var(--dashboard-icon-glyph-size, 28px);
 	background: currentColor;
 	-webkit-mask: var(--dashboard-icon) center / contain no-repeat;
 	mask: var(--dashboard-icon) center / contain no-repeat;
@@ -257,6 +384,8 @@
 	display: inline-flex;
 	align-items: center;
 	gap: 6px;
+	min-width: 0;
+	overflow-wrap: anywhere;
 }
 
 .dashboard-legend-inline i {
@@ -425,11 +554,7 @@
 
 .dashboard-legend-inline b {
 	color: var(--dashboard-text);
-}
-
-/* ---- WAN traffic: one counter source per plot ---- */
-.dashboard-traffic-source {
-	min-width: 0;
+	white-space: nowrap;
 }
 
 /* ---- Wireless network boxes (LuCI .ifacebox) ---- */
@@ -486,9 +611,56 @@
 	color: var(--dashboard-text-muted);
 }
 
-.dashboard-client-addresses {
+#dashboard-wifi-table .td {
+	white-space: normal;
 	overflow-wrap: anywhere;
 }
+
+.dashboard-client-stack {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	min-width: 0;
+	white-space: normal;
+	overflow-wrap: anywhere;
+	line-height: 1.4;
+}
+
+.dashboard-client-primary {
+	font-weight: 600;
+}
+
+.dashboard-client-secondary {
+	font-size: 0.875em;
+	color: var(--dashboard-text-muted);
+}
+
+.dashboard-client-transfer {
+	font-variant-numeric: tabular-nums;
+}
+
+.Dashboard tr.dashboard-client-located > td {
+	background: var(--dashboard-surface-alt);
+}
+
+.Dashboard tr.dashboard-client-located > td:first-child {
+	box-shadow: inset 3px 0 var(--dashboard-primary);
+}
+
+.Dashboard .dashboard-client-locate {
+	margin: 0;
+	padding: 0;
+	border: 0;
+	background: none;
+	color: var(--dashboard-primary);
+	font: inherit;
+	text-align: left;
+	white-space: normal;
+	overflow-wrap: anywhere;
+	cursor: pointer;
+}
+
+.Dashboard .dashboard-client-locate:hover { text-decoration: underline; }
 
 
 /* ---- Responsive ---- */
@@ -508,15 +680,10 @@
 		--dashboard-gap: 12px;
 	}
 
-	.dashboard-kpi-icon {
-		width: 46px;
-		height: 46px;
-		border-radius: 12px;
-	}
+	.dashboard-kpi-icon { --dashboard-icon-size: 46px; }
 
-	.dashboard-kpi-icon::after {
-		inset: 11px;
-	}
+	.dashboard-kpi-icon,
+	.dashboard-topology-icon { --dashboard-icon-glyph-size: 24px; }
 
 	.dashboard-bars {
 		--dashboard-plot-h: 140px;
