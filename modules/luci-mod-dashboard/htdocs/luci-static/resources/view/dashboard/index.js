@@ -113,10 +113,16 @@ function rowSizes(n, max, shortFirst) {
 
 function fillRows(nodes, slot) {
 	let i = 0;
+	const regular = nodes.filter(node => {
+		if (node.dataset.dashboardSpan != 'full')
+			return true;
+		node.style.setProperty('--dashboard-per-row', 1);
+		return false;
+	});
 
-	rowSizes(nodes.length, ROWS[slot].max, ROWS[slot].shortFirst).forEach(size => {
+	rowSizes(regular.length, ROWS[slot].max, ROWS[slot].shortFirst).forEach(size => {
 		for (let n = 0; n < size; n++)
-			nodes[i++].style.setProperty('--dashboard-per-row', size);
+			regular[i++].style.setProperty('--dashboard-per-row', size);
 	});
 
 	return nodes;
@@ -188,6 +194,7 @@ function updateTabs(tabMap, tabGroup, items, form) {
 		items.forEach(tab => {
 			const pane = (tab.id === 'layout' && form) ? form : E('div', {
 				'class': 'cbi-section',
+				'id': 'dashboard-detail-' + tab.id,
 				'data-tab': tab.id,
 				'data-tab-title': (tab.count != null) ? '%s (%d)'.format(tab.title, tab.count) : tab.title
 			}, (typeof(tab.content) == 'function') ? tab.content() : tab.content);
@@ -250,6 +257,79 @@ function startPolling(includes, layout, root, form) {
 		tabs: tabMap,
 		extra: extraContainer
 	};
+	let returnSource = null;
+	const headerOffset = () => {
+		const header = document.querySelector('header');
+		return header && [ 'fixed', 'sticky' ].includes(getComputedStyle(header).position)
+			? Math.max(0, header.getBoundingClientRect().bottom) : 0;
+	};
+	const updateReturnLinks = () => {
+		root.querySelectorAll('[data-dashboard-return]').forEach(link => {
+			link.hidden = !returnSource?.isConnected;
+		});
+	};
+	root.addEventListener('dashboard-client-filter', ev => {
+		root.querySelectorAll('[data-dashboard-tab="wifi"]').forEach(link => {
+			const selected = !!ev.detail.network && link.dataset.dashboardNetwork === ev.detail.network;
+			if (selected) {
+				link.setAttribute('aria-current', 'true');
+				if (returnSource)
+					returnSource = link;
+			}
+			else {
+				link.removeAttribute('aria-current');
+			}
+		});
+	});
+
+	// Widgets declare destinations; the shell owns native LuCI tab activation.
+	// Use the tab's own click handler so its state and events stay in sync.
+	root.addEventListener('click', ev => {
+		if (ev.target.closest('[data-dashboard-return]')) {
+			ev.preventDefault();
+			if (returnSource?.isConnected) {
+				returnSource.focus({ preventScroll: true });
+				const overview = returnSource.closest('[data-dashboard-overview]') || returnSource;
+				window.scrollTo({ top: Math.max(0, window.scrollY + overview.getBoundingClientRect().top - headerOffset() - 16), behavior: 'auto' });
+			}
+			return;
+		}
+		const source = ev.target.closest('[data-dashboard-tab]');
+		if (!source || !root.contains(source))
+			return;
+		ev.preventDefault();
+		const id = source.dataset.dashboardTab;
+		const tab = Array.from(tabMap.querySelectorAll('.cbi-tabmenu > li'))
+			.find(node => node.dataset.tab == id)?.querySelector('a');
+		const pane = Array.from(tabGroup.children).find(node => node.dataset.tab == id);
+		if (!tab || !pane)
+			return;
+		if (source.closest('[data-dashboard-overview]'))
+			returnSource = source;
+		tab.click();
+		const owner = includes.find(include => include.widgets?.some(widget => widget.slot == 'tabs' && widget.id == id));
+		owner?.navigate?.({ network: source.dataset.dashboardNetwork || null });
+		updateReturnLinks();
+		const section = Array.from(pane.querySelectorAll('[data-dashboard-section]'))
+			.find(node => node.dataset.dashboardSection == source.dataset.dashboardSection);
+		const target = section || pane;
+		target.tabIndex = -1;
+		target.focus({ preventScroll: true });
+		// Keep the tab bar in view when the section fits; on a narrow screen,
+		// scroll straight to the requested list instead of stopping at cards.
+		const headerBottom = headerOffset();
+		const menu = tabMap.querySelector('.cbi-tabmenu');
+		// Keep the active destination visible in horizontally scrolling themes.
+		const menuRect = menu.getBoundingClientRect();
+		const tabRect = tab.parentElement.getBoundingClientRect();
+		if (tabRect.left < menuRect.left || tabRect.right > menuRect.right)
+			menu.scrollLeft += tabRect.left - menuRect.left - (menu.clientWidth - tabRect.width) / 2;
+		const menuTop = menu.getBoundingClientRect().top;
+		const rect = target.getBoundingClientRect();
+		const fits = rect.bottom - menuTop <= window.innerHeight - headerBottom - 32;
+		const top = section && !fits ? rect.top : menuTop;
+		window.scrollTo({ top: Math.max(0, window.scrollY + top - headerBottom - 16), behavior: 'auto' });
+	});
 
 	const step = () => {
 		return network.flushCache().then(() => {
@@ -270,6 +350,13 @@ function startPolling(includes, layout, root, form) {
 
 			if (sections.tabs.length)
 				updateTabs(tabMap, tabGroup, sections.tabs, form);
+
+			root.querySelectorAll('[data-dashboard-tab]').forEach(link => {
+				const available = sections.tabs.some(tab => tab.id == link.dataset.dashboardTab);
+				link.disabled = !available;
+				link.title = available ? '' : _('Enable this detail tab in Settings to view it.');
+			});
+			updateReturnLinks();
 
 			if (sections.extra.length)
 				L.dom.content(extraContainer, sections.extra);

@@ -163,6 +163,11 @@ return baseclass.extend({
 				else
 					tbody.appendChild(tr);
 			}
+			else {
+				const label = placeholder.querySelector('em');
+				if (label && label.textContent !== opts.emptyText)
+					label.textContent = opts.emptyText;
+			}
 		}
 		else if (placeholder) {
 			tbody.removeChild(placeholder);
@@ -180,6 +185,9 @@ return baseclass.extend({
 				opts.foot.map(content => cell('td', content)).forEach(td => foot.appendChild(td));
 				foot.lastChild.setAttribute('colspan', head.length - opts.foot.length + 1);
 			}
+		}
+		else if (foot) {
+			foot.remove();
 		}
 
 		return table;

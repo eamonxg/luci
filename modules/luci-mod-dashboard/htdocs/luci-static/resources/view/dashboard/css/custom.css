@@ -60,6 +60,68 @@
 }
 
 /* ---- Layout ---- */
+.dashboard-client-heading {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+
+.Dashboard .dashboard-client-heading > h3 {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	margin: 0;
+	padding: 0;
+	border: 0;
+}
+
+.dashboard-client-count {
+	font-size: 12px;
+	font-weight: normal;
+	color: var(--dashboard-text-muted);
+}
+
+.Dashboard .dashboard-detail-return {
+	padding: 0;
+	border: 0;
+	background: none;
+	color: var(--dashboard-primary);
+	font: inherit;
+	font-size: 12px;
+	cursor: pointer;
+}
+
+.Dashboard .dashboard-detail-return:hover { text-decoration: underline; }
+.Dashboard .dashboard-detail-return[hidden] { display: none; }
+
+.dashboard-client-toolbar {
+	display: grid;
+	grid-template-columns: minmax(180px, 1.1fr) minmax(150px, 1fr) auto;
+	align-items: end;
+	gap: 12px;
+	margin: 16px 0;
+}
+
+.dashboard-client-toolbar > div { min-width: 0; }
+.dashboard-client-toolbar label { display: block; font-size: 12px; margin-bottom: 5px; color: var(--dashboard-text-muted); }
+.Dashboard .dashboard-client-toolbar select,
+.Dashboard .dashboard-client-toolbar input { box-sizing: border-box; width: 100%; min-width: 0; max-width: 100%; margin: 0; }
+.Dashboard .dashboard-client-toolbar > button { margin: 0; min-height: 32px; }
+.dashboard-network-details { margin-top: 16px; border-top: 1px solid var(--dashboard-border); }
+.dashboard-network-details > summary { padding: 12px 0; cursor: pointer; font-weight: bold; }
+
+@media (max-width: 600px) {
+	.dashboard-client-toolbar { grid-template-columns: minmax(0, 1fr) auto; gap: 10px; }
+	.dashboard-client-network-control { grid-column: 1 / -1; }
+}
+
+.Dashboard [data-dashboard-section]:focus,
+.Dashboard [data-tab]:focus {
+	outline: none;
+}
+
 .dashboard-settings .dashboard-widget-list {
 	display: flex;
 	flex-direction: column;
@@ -573,8 +635,32 @@
 	color: var(--dashboard-text-muted);
 }
 
-.dashboard-client-addresses {
+#dashboard-wifi-table .td {
+	white-space: normal;
 	overflow-wrap: anywhere;
+}
+
+.dashboard-client-stack {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	min-width: 0;
+	white-space: normal;
+	overflow-wrap: anywhere;
+	line-height: 1.4;
+}
+
+.dashboard-client-primary {
+	font-weight: 600;
+}
+
+.dashboard-client-secondary {
+	font-size: 0.875em;
+	color: var(--dashboard-text-muted);
+}
+
+.dashboard-client-transfer {
+	font-variant-numeric: tabular-nums;
 }
 
 
