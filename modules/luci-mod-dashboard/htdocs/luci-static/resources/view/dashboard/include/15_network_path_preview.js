@@ -36,7 +36,7 @@ function reconcile(parent, children) {
 
 return baseclass.extend({
 	// Preserve the widget id already stored in saved dashboard layouts.
-	widgets: [ { id: 'network_path_preview', slot: 'charts', title: _('Network topology'), order: 5, hidden: true } ],
+	widgets: [ { id: 'network_path_preview', slot: 'charts', title: _('Network topology'), order: 5 } ],
 	dataSources: [ 'router', 'wifi' ],
 
 	init() {
