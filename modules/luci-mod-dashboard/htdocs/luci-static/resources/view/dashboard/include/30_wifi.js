@@ -80,7 +80,15 @@ return baseclass.extend({
 			? _('Wireless peers and clients') : _('Wireless clients');
 	},
 
+	unavailableChart(title) {
+		return this.params.wifi.radios.some(radio => radio.clientsKnown === false)
+			? charts.card({ title, body: charts.empty(_('Wireless association data unavailable.')) }) : null;
+	},
+
 	renderDistributionChart() {
+		const unavailable = this.unavailableChart(_('Wireless client distribution'));
+		if (unavailable)
+			return unavailable;
 		const devices = this.params.wifi.devices;
 		const series = this.params.wifi.radios.map(radio => ({
 			label: [ radio.ssid.value, ' ', E('small', {}, [ radio.chan.value ]) ],
@@ -97,6 +105,9 @@ return baseclass.extend({
 	},
 
 	renderSignalChart() {
+		const unavailable = this.unavailableChart(_('Signal Strength'));
+		if (unavailable)
+			return unavailable;
 		const devices = this.params.wifi.devices.slice().sort((a, b) => rssiOf(b) - rssiOf(a));
 
 		return charts.card({
@@ -157,6 +168,9 @@ return baseclass.extend({
 	},
 
 	renderTrafficChart() {
+		const unavailable = this.unavailableChart(_('Wireless client data usage'));
+		if (unavailable)
+			return unavailable;
 		const devices = this.params.wifi.devices.slice().sort((a, b) =>
 			(b.transferred.value.bytes.rx + b.transferred.value.bytes.tx) - (a.transferred.value.bytes.rx + a.transferred.value.bytes.tx));
 		const peak = Math.max(1, ...devices.map(device => Math.max(device.transferred.value.bytes.rx, device.transferred.value.bytes.tx)));
