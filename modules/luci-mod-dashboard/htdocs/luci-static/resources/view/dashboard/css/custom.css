@@ -560,13 +560,29 @@
 /* ---- Wireless network boxes (LuCI .ifacebox) ---- */
 .dashboard-net-grid {
 	display: grid;
-	grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+	grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr));
 	gap: 12px;
 	margin-bottom: 18px;
 }
 
 .Dashboard .ifacebox {
 	margin: 0;
+}
+
+.Dashboard .ifacebox[data-dashboard-network-card][aria-current="true"] {
+	box-shadow: inset 0 0 0 2px var(--dashboard-primary);
+}
+
+.Dashboard .ifacebox[data-dashboard-network-card]:focus-visible {
+	outline: 2px solid var(--dashboard-primary);
+	outline-offset: 2px;
+}
+
+.dashboard-net-band {
+	display: block;
+	font-size: 12px;
+	font-weight: normal;
+	color: var(--dashboard-text-muted);
 }
 
 .Dashboard .ifacebox-body {

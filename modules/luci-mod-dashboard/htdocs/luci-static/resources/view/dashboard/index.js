@@ -336,7 +336,8 @@ function startPolling(includes, layout, root, form) {
 			return;
 		const destination = {
 			network: source.dataset.dashboardNetwork || null,
-			client: source.dataset.dashboardClient ? source.dataset.dashboardClient.toUpperCase() : null
+			client: source.dataset.dashboardClient ? source.dataset.dashboardClient.toUpperCase() : null,
+			section: source.dataset.dashboardSection || null
 		};
 		if (id !== 'wifi')
 			source.closest('[data-dashboard-overview]')?.dispatchEvent(new CustomEvent('dashboard-topology-selection', {
@@ -344,13 +345,13 @@ function startPolling(includes, layout, root, form) {
 			}));
 		tab.click();
 		const owner = includes.find(include => include.widgets?.some(widget => widget.slot == 'tabs' && widget.id == id));
-		owner?.navigate?.(destination);
+		const destinationNode = owner?.navigate?.(destination);
 		const section = Array.from(pane.querySelectorAll('[data-dashboard-section]'))
 			.find(node => node.dataset.dashboardSection == source.dataset.dashboardSection);
 		const row = (destination.client || destination.network) ? Array.from(pane.querySelectorAll('[data-dashboard-client-row]'))
 			.find(node => (!destination.client || node.dataset.dashboardClientRow === destination.client) &&
 				(!destination.network || node.dataset.dashboardNetwork === destination.network)) : null;
-		const target = row || section || pane;
+		const target = destinationNode || row || section || pane;
 		target.tabIndex = -1;
 		target.focus({ preventScroll: true });
 		// Keep the tab bar in view when the section fits; on a narrow screen,
@@ -365,7 +366,7 @@ function startPolling(includes, layout, root, form) {
 		const menuTop = menu.getBoundingClientRect().top;
 		const rect = target.getBoundingClientRect();
 		const fits = rect.bottom - menuTop <= frame.bottom - frame.top - 32;
-		const top = (row || section) && !fits ? rect.top : menuTop;
+		const top = (destinationNode || row || section) && !fits ? rect.top : menuTop;
 		scrollToTarget(frame, top);
 	});
 
@@ -376,7 +377,7 @@ function startPolling(includes, layout, root, form) {
 			const sections = collectSections(includes, results, layout);
 			const consumers = includes.filter(include => !include.failed && !include.skipped && include.updateTopology);
 			if (consumers.length) {
-				const snapshot = {};
+				const snapshot = { wifiSupported: includes.some(include => include.topologySource === 'wifi') };
 				includes.forEach(include => {
 					if (!include.failed && !include.skipped && include.topologySource)
 						snapshot[include.topologySource] = include.getTopologyData();
@@ -401,7 +402,7 @@ function startPolling(includes, layout, root, form) {
 			root.querySelectorAll('[data-dashboard-tab]').forEach(link => {
 				const available = sections.tabs.some(tab => tab.id == link.dataset.dashboardTab);
 				link.disabled = !available;
-				link.title = available ? '' : _('Enable this detail tab in Settings to view it.');
+				link.title = available ? '' : _('Details unavailable.');
 			});
 
 			if (sections.extra.length)

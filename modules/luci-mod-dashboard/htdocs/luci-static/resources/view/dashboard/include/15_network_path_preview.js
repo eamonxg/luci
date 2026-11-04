@@ -36,7 +36,10 @@ function reconcile(parent, children) {
 
 return baseclass.extend({
 	// Preserve the widget id already stored in saved dashboard layouts.
-	widgets: [ { id: 'network_path_preview', slot: 'charts', title: _('Network topology'), order: 5 } ],
+	widgets: [ {
+		id: 'network_path_preview', slot: 'charts', title: _('Network topology'), order: 5,
+		detailTabs: [ 'internet', 'system', 'wifi' ]
+	} ],
 	dataSources: [ 'router', 'wifi' ],
 
 	init() {
@@ -66,13 +69,8 @@ return baseclass.extend({
 					this.networks.querySelector('button')?.focus({ preventScroll: true });
 			}
 		});
-		this.leases = E('button', {
-			type: 'button', 'class': 'dashboard-topology-link', 'data-dashboard-tab': 'dhcp'
-		}, _('DHCP leases'));
 		this.node = charts.card({
-			title: E('span', { 'class': 'dashboard-topology-heading' }, [
-				E('span', {}, _('Network topology')), this.leases
-			]),
+			title: _('Network topology'),
 			className: 'dashboard-topology',
 			body: [
 				E('div', { 'class': 'dashboard-topology-columns', 'aria-hidden': 'true' }, [
@@ -118,8 +116,8 @@ return baseclass.extend({
 		attr(node.button, 'data-dashboard-tab', data.tab);
 		attr(node.button, 'data-dashboard-network', data.network);
 		attr(node.button, 'data-dashboard-client', data.mac);
-		attr(node.button, 'data-dashboard-section', data.tab === 'wifi' ? 'clients' : null);
-		attr(node.button, 'aria-label', _('%s: go to details').format(data.name));
+		attr(node.button, 'data-dashboard-section', data.tab === 'wifi' ? (data.mac ? 'clients' : 'networks') : null);
+		attr(node.button, 'aria-label', _('%s: go to details').format([ data.name, data.detail ].filter(Boolean).join(' · ')));
 		attr(node.name, 'title', data.name);
 		attr(node.detail, 'title', data.detail);
 		text(node.name, data.name);
@@ -155,7 +153,6 @@ return baseclass.extend({
 				}
 			});
 			branch.moreItem = E('li', { 'class': 'dashboard-topology-leaf dashboard-topology-more' }, branch.more);
-			branch.emptyItem = E('li', { 'class': 'dashboard-topology-leaf dashboard-topology-empty' }, _('No clients'));
 			branch.item = E('li', { 'class': 'dashboard-topology-branch' }, [ branch.group, branch.clients ]);
 			this.branches.set(id, branch);
 		}
@@ -188,6 +185,8 @@ return baseclass.extend({
 
 		let remaining = MAX_CLIENTS;
 		let rows = 0;
+		let mobileRows = 0;
+		let mobileGroups = 0;
 		const visibleNetworks = model.networks.slice(0, this.networkLimit);
 		const revealedNetwork = model.networks.find(net => net.id === this.revealed?.network);
 		if (revealedNetwork && !visibleNetworks.includes(revealedNetwork))
@@ -202,6 +201,7 @@ return baseclass.extend({
 				name: net.name, detail: net.detail, icon: 'wireless', tab: 'wifi', network: net.id
 			}, live);
 			attr(branch.item, 'data-network', net.id);
+			attr(branch.item, 'data-has-clients', net.clients.length ? 'true' : null);
 			attr(group, 'data-active', net.active ? 'true' : 'false');
 			text(branch.toggle, branch.collapsed ? '+' : '−');
 			attr(branch.toggle, 'aria-expanded', String(!branch.collapsed));
@@ -241,23 +241,26 @@ return baseclass.extend({
 				attr(branch.more, 'data-dashboard-section', canExpand ? null : 'clients');
 				items.push(branch.moreItem);
 			}
-			else if (!items.length) {
-				items.push(branch.emptyItem);
-			}
 			// Fixed-height slots provide connector geometry without reading layout.
 			branch.rowStart = rows;
-			branch.rowCount = items.length;
+			branch.rowCount = Math.max(1, items.length);
+			branch.mobileStartRows = mobileRows;
+			branch.mobileStartGroups = mobileGroups;
 			branch.index = index;
 			branch.visibleClients = shown.map(client => client.mac);
-			rows += items.length;
+			rows += branch.rowCount;
+			mobileRows += 1 + items.length;
+			mobileGroups += items.length ? 1 : 0;
 			reconcile(branch.clients, items);
+			branch.clients.hidden = !items.length;
 			return branch.item;
 		});
 		this.rowCount = rows;
 		reconcile(this.networks, branchNodes);
 		this.networks.hidden = !model.networks.length;
+		attr(this.node, 'data-has-networks', model.networks.length ? 'true' : null);
 		attr(this.router, 'data-has-networks', model.networks.length ? 'true' : null);
-		this.message.hidden = !!model.networks.length;
+		this.message.hidden = !!model.networks.length || !model.wifiSupported;
 		text(this.message, model.wifiAvailable ? _('No wireless access points reported.') : _('Wireless data unavailable.'));
 		const hidden = model.networks.length - visibleNetworks.length;
 		this.moreNetworks.hidden = hidden <= 0;
@@ -299,7 +302,6 @@ return baseclass.extend({
 			branch.item.classList.toggle('dashboard-topology-selected', selected);
 			branch.item.classList.toggle('dashboard-topology-client-path', selected && (!client || target >= 0));
 			branch.moreItem.classList.toggle('dashboard-topology-selected', selected && !client);
-			branch.emptyItem.classList.toggle('dashboard-topology-selected', selected && !client);
 			attr(branch.clients, 'style', '--topology-path-start:' + start + ';--topology-path-length:' + length +
 				';--topology-mobile-path-end:' + (client ? Math.max(0, target) : branch.rowCount - 1));
 		}
@@ -308,8 +310,8 @@ return baseclass.extend({
 		attr(this.networks, 'style', '--topology-first:' + ((first?.rowCount - 1) / 2 || 0) +
 			';--topology-last:' + ((last?.rowCount - 1) / 2 || 0) +
 			';--topology-path-start:' + Math.min(midpoint, target) + ';--topology-path-length:' + Math.abs(midpoint - target) +
-			';--topology-mobile-end-rows:' + (last?.rowStart || 0) + ';--topology-mobile-end-branches:' + (last?.index || 0) +
-			';--topology-mobile-path-rows:' + (selectedBranch?.rowStart || 0) + ';--topology-mobile-path-branches:' + (selectedBranch?.index || 0));
+			';--topology-mobile-end-rows:' + (last?.mobileStartRows || 0) + ';--topology-mobile-end-groups:' + (last?.mobileStartGroups || 0) +
+			';--topology-mobile-path-rows:' + (selectedBranch?.mobileStartRows || 0) + ';--topology-mobile-path-groups:' + (selectedBranch?.mobileStartGroups || 0));
 		this.networks.classList.toggle('dashboard-topology-selected', !!selectedBranch);
 		this.upstreams.classList.toggle('dashboard-topology-selected', !!selectedBranch);
 		this.router.classList.toggle('dashboard-topology-selected', !!selectedBranch);

@@ -56,6 +56,7 @@ const CLIENT_ICON_HINTS = [
 	[ 'watch', /(?:^|[^a-z0-9])(?:apple[-_. ]?watch|galaxy[-_. ]?watch|pixel[-_. ]?watch|smartwatch|watch)[0-9]*(?=$|[^a-z0-9])|手表/i ],
 	[ 'tablet', /(?:^|[^a-z0-9])(?:ipad(?:air|mini|pro)?|tablet|galaxy[-_. ]?tab|(?:xiaomi|redmi|oneplus|honor|iqoo)[-_. ]?pad|pad)[0-9]*(?=$|[^a-z0-9])|平板/i ],
 	[ 'computer', /(?:^|[^a-z0-9])(?:macbook(?:air|pro)?|imac|macmini|macstudio|mac|thinkpad|laptop|notebook|desktop|computer|pc)[0-9]*(?=$|[^a-z0-9])|电脑|笔记本/i ],
+	[ 'phone', /(?:^|[^a-z0-9])galaxy[-_. ]?(?:(?:[samf]|note)[-_. ]?[0-9]+(?:fe|plus|ultra)?|z[-_. ]?(?:flip|fold)[-_. ]?[0-9]*)(?=$|[^a-z0-9])/i ],
 	[ 'phone', /(?:^|[^a-z0-9])(?:iqoo[-_. ]?(?:(?:neo|z)[-_. ]?)?|pixel[-_. ]?|redmi[-_. ]?note[-_. ]?)[0-9]+(?:pro|plus)?(?=$|[^a-z0-9])/i ],
 	[ 'phone', /(?:^|[^a-z0-9])(?:iphone[0-9]*(?:mini|plus|pro|max)*|(?:smartphone|phone)[0-9]*)(?=$|[^a-z0-9])|手机/i ]
 ];
@@ -104,7 +105,10 @@ return baseclass.extend({
 			const id = text(item?.id);
 			if (!id || networks.has(id))
 				continue;
-			networks.set(id, { id, name: text(item.name) || id, detail: text(item.band), active: item.active === true, clients: [] });
+			networks.set(id, {
+				id, name: text(item.name) || id, detail: text(item.band),
+				active: item.active === true, disabled: item.disabled === true, clients: []
+			});
 		}
 
 		for (const item of Array.isArray(wifi.clients) ? wifi.clients : []) {
@@ -128,7 +132,10 @@ return baseclass.extend({
 
 		for (const network of networks.values()) {
 			network.clients.sort(byId);
-			network.detail = [ network.detail, network.clients.length === 1 ? _('1 client') : _('%d clients').format(network.clients.length) ].filter(Boolean).join(' · ');
+			const status = network.clients.length
+				? (network.clients.length === 1 ? _('1 client') : _('%d clients').format(network.clients.length))
+				: network.disabled ? _('Disabled') : network.active ? _('No clients') : _('Link down');
+			network.detail = [ network.detail, status ].filter(Boolean).join(' · ');
 		}
 
 		return {
@@ -139,7 +146,8 @@ return baseclass.extend({
 			upstreams: Array.from(upstreams.values()).sort(byId),
 			networks: Array.from(networks.values()).sort(byId),
 			totalClients: clientIds.size,
-			wifiAvailable: source.wifi != null
+			wifiAvailable: source.wifi != null,
+			wifiSupported: source.wifiSupported ?? source.wifi != null
 		};
 	}
 });
