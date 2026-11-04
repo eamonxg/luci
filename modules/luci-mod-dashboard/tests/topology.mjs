@@ -179,3 +179,10 @@ test('mesh without counters or confirmed peer state does not turn missing values
 	assert.equal(wifi.params.wifi.devices[0].transferred.value.bytes.rx,null);
 	assert.equal(wifi.getTopologyData().clients[0].associated,false);
 });
+
+test('optional wireless charts do not turn failed collection into no clients', () => {
+	const wifi = module('include/30_wifi.js',{charts:{card:options=>options,empty:message=>message}});
+	wifi.params={wifi:{radios:[{clientsKnown:false}],devices:[]}};
+	for(const method of ['renderDistributionChart','renderSignalChart','renderTrafficChart'])
+		assert.equal(wifi[method]().body,'Wireless association data unavailable.');
+});
