@@ -73,79 +73,169 @@ function byId(a, b) {
 	return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
 }
 
+function names(values) {
+	return Array.isArray(values) ? Array.from(new Set(values.map(text).filter(Boolean))) : [];
+}
+
+function modeLabel(mode) {
+	if (mode === 'ap' || mode === 'ap-wds')
+		return _('Access point');
+	if (mode === 'sta' || mode === 'sta-wds')
+		return _('Wireless uplink');
+	if (mode === 'mesh')
+		return _('Mesh peers');
+	return _('Wireless peers');
+}
+
 return baseclass.extend({
 	buildModel(snapshot) {
 		const source = snapshot || {};
 		const router = source.router || {};
+		const connections = source.connections || {};
 		const wifi = source.wifi || {};
+		const groups = new Map();
+		const radios = new Map();
 		const upstreams = new Map();
-		const networks = new Map();
-		const clientIds = new Set();
+		const observedMACs = new Set();
+		const memberIds = new Set();
+		const interfaces = Array.isArray(connections.interfaces) ? connections.interfaces : [];
 
+		for (const item of interfaces) {
+			const name = text(item?.id);
+			if (!name || name === 'loopback' || item.device === 'lo')
+				continue;
+			groups.set('net:' + name, {
+				id: 'net:' + name, name: text(item.name) || name, icon: 'network',
+				kind: 'logical', relation: 'logical', tab: 'connections', network: name,
+				context: text(item.device) || text(item.protocol), active: item.up === true,
+				members: [], wifiNetworks: [], errors: [], radios: 0
+			});
+		}
+
+		// These are reported default-route links, not Internet reachability or
+		// policy-routing decisions. Families share a reported device or interface identity.
 		for (const item of Array.isArray(router.upstreams) ? router.upstreams : []) {
 			if (!item || (item.family !== 4 && item.family !== 6))
 				continue;
-			const network = text(item.network);
-			const device = text(item.device);
-			const gatewayKey = addressKey(item.gateway);
-			const gateway = gatewayKey && ![ '0.0.0.0', '0:0:0:0:0:0:0:0' ].includes(gatewayKey) ? text(item.gateway) : '';
-			if (!network && !device && !gateway)
+			const network = text(item.network), device = text(item.device);
+			const gateway = addressKey(item.gateway);
+			if (!network && !device)
 				continue;
-			const id = [ item.family, network || device, gateway ? gatewayKey : '' ].join('|');
+			const id = device ? 'device:' + device : 'network:' + network;
 			if (!upstreams.has(id))
-				upstreams.set(id, {
-					id,
-					name: gateway || device || network,
-					detail: [ network, 'IPv' + item.family, item.up === true ? _('Link up') : _('Link down') ].filter(Boolean).join(' · '),
-					up: item.up === true
-				});
+				upstreams.set(id, { id, names: [], families: [], states: [], gateways: [], network, tab: 'connections', icon: 'internet' });
+			const up = upstreams.get(id);
+			if (network && !up.names.includes(network))
+				up.names.push(network);
+			if (!up.families.includes(item.family))
+				up.families.push(item.family);
+			up.states.push(item.up === true);
+			if (gateway && ![ '0.0.0.0', '0:0:0:0:0:0:0:0' ].includes(gateway) && !up.gateways.includes(gateway))
+				up.gateways.push(gateway);
+		}
+		for (const up of upstreams.values()) {
+			up.name = up.names.join(' / ') || up.id.slice(7);
+			const state = up.states.every(Boolean) ? _('Link up') : up.states.some(Boolean) ? _('Mixed link state') : _('Link down');
+			up.detail = up.families.sort().map(family => 'IPv' + family).join(' / ') + ' · ' + state;
+			up.active = up.states.some(Boolean);
 		}
 
+		const wirelessGroup = radio => {
+			const id = 'wifi:' + radio.id;
+			if (!groups.has(id))
+				groups.set(id, {
+					id, name: radio.name, icon: 'wireless', kind: radio.ap ? 'wireless' : 'peer',
+					relation: 'logical', tab: 'wifi', network: radio.id,
+					context: [ modeLabel(radio.mode), radio.band ].filter(Boolean).join(' · '),
+					active: radio.active, members: [], wifiNetworks: [], errors: [], radios: 0
+				});
+			return groups.get(id);
+		};
+		const groupFor = (radio, bindings) => {
+			if (!radio.ap || bindings.length !== 1)
+				return wirelessGroup(radio);
+			const id = 'net:' + bindings[0];
+			if (!groups.has(id))
+				groups.set(id, {
+					id, name: bindings[0], icon: 'network', kind: 'logical', relation: 'logical',
+					tab: 'wifi', network: radio.id, context: _('Reported wireless binding'),
+					active: radio.active, members: [], wifiNetworks: [], errors: [], radios: 0
+				});
+			return groups.get(id);
+		};
+		const linkRadio = (group, radio) => {
+			if (!group.wifiNetworks.includes(radio.id)) {
+				group.wifiNetworks.push(radio.id);
+				group.radios++;
+				if (!radio.known)
+					group.errors.push(radio.id);
+			}
+		};
+
 		for (const item of Array.isArray(wifi.networks) ? wifi.networks : []) {
-			const id = text(item?.id);
-			if (!id || networks.has(id))
+			const id = text(item?.id), mode = text(item?.mode) || 'ap';
+			if (!id || radios.has(id) || mode === 'monitor')
 				continue;
-			networks.set(id, {
-				id, name: text(item.name) || id, detail: text(item.band),
-				active: item.active === true, disabled: item.disabled === true, clients: []
-			});
+			const radio = {
+				id, name: text(item.name) || id, mode, ap: mode === 'ap' || mode === 'ap-wds',
+				band: text(item.band), active: item.active === true, known: item.clientsKnown !== false,
+				bindings: names(item.interfaces)
+			};
+			radios.set(id, radio);
+			linkRadio(groupFor(radio, radio.bindings), radio);
 		}
 
 		for (const item of Array.isArray(wifi.clients) ? wifi.clients : []) {
-			const network = networks.get(text(item?.network));
-			const mac = macAddress(item?.mac);
-			if (!network || !mac)
+			const radio = radios.get(text(item?.network)), mac = macAddress(item?.mac);
+			if (!radio || !radio.known || !mac)
 				continue;
-			const id = network.id + '|' + mac;
-			if (clientIds.has(id))
+			const bindings = Array.isArray(item.interfaces) ? names(item.interfaces) : radio.bindings;
+			const group = groupFor(radio, bindings);
+			linkRadio(group, radio);
+			const id = group.id + '|' + radio.id + '|' + mac;
+			if (memberIds.has(id))
 				continue;
-			clientIds.add(id);
-			const ips = addresses(item.addresses);
-			const name = text(item.name);
-			network.clients.push({
-				id, network: network.id, mac,
-				name: name && name !== '?' ? name : mac,
-				icon: clientIcon(name),
-				detail: ips[0]?.replace(/\/\d+$/, '') || mac
+			memberIds.add(id);
+			observedMACs.add(mac);
+			const ips = addresses(item.addresses), name = text(item.name);
+			const associated = radio.mode === 'mesh' ? item.associated === true : item.associated !== false;
+			group.members.push({
+				id, name: name && name !== '?' ? name : mac, icon: radio.ap ? clientIcon(name) : 'router',
+				tab: 'wifi', network: radio.id, mac, relation: associated ? 'observed' : 'unknown',
+				detail: associated ? [ ips[0]?.replace(/\/\d+$/, '') || mac, radio.band ].filter(Boolean).join(' · ') : _('Peer state unknown'),
+				context: [ radio.name, modeLabel(radio.mode), associated ? '' : _('Peer state unknown') ].filter(Boolean).join(' · ')
 			});
 		}
 
-		for (const network of networks.values()) {
-			network.clients.sort(byId);
-			const status = network.clients.length
-				? (network.clients.length === 1 ? _('1 client') : _('%d clients').format(network.clients.length))
-				: network.disabled ? _('Disabled') : network.active ? _('No clients') : _('Link down');
-			network.detail = [ network.detail, status ].filter(Boolean).join(' · ');
+		for (const group of groups.values()) {
+			group.members.sort(byId);
+			const count = group.members.length;
+			const quantity = group.kind === 'peer' ? _('%d reported peers').format(count) : _('%d wireless associations').format(count);
+			group.detail = [ group.context, count ? quantity : group.errors.length ? _('Data unavailable') : group.active ? _('Link up') : _('Link down') ].filter(Boolean).join(' · ');
+			group.summary = count ? quantity : group.errors.length ? _('Wireless association data unavailable.')
+				: group.radios ? _('No wireless associations reported.') : _('Endpoint attachment not reported.');
+			if (count && group.errors.length)
+				group.summary += ' · ' + _('Some wireless data is unavailable.');
+		}
+
+		const unplaced = new Map();
+		for (const item of Array.isArray(connections.hosts) ? connections.hosts : []) {
+			const mac = macAddress(item?.mac), ips = addresses(item?.addresses);
+			const name = text(item?.name);
+			if (!mac || observedMACs.has(mac) || unplaced.has(mac))
+				continue;
+			unplaced.set(mac, {
+				id: mac, mac, name: name && name !== '?' ? name : mac, detail: ips[0]?.replace(/\/\d+$/, '') || _('Attachment unknown'),
+				icon: clientIcon(item.name), tab: 'connections', relation: 'unknown', context: _('Attachment unknown')
+			});
 		}
 
 		return {
-			router: {
-				name: text(router.hostname) || text(router.model) || _('This router'),
-				detail: text(router.managementAddress) || text(router.model)
-			},
+			router: { id: 'router', name: text(router.hostname) || text(router.model) || _('This device'), detail: text(router.managementAddress) || text(router.model), icon: 'router', tab: 'system' },
 			upstreams: Array.from(upstreams.values()).sort(byId),
-			networks: Array.from(networks.values()).sort(byId),
-			totalClients: clientIds.size,
+			groups: Array.from(groups.values()).sort(byId),
+			unplaced: Array.from(unplaced.values()).sort(byId),
+			interfacesAvailable: Array.isArray(connections.interfaces),
 			wifiAvailable: source.wifi != null,
 			wifiSupported: source.wifiSupported ?? source.wifi != null
 		};
