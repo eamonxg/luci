@@ -1,5 +1,6 @@
 'use strict';
 'require baseclass';
+'require network';
 
 function text(value) {
 	return typeof(value) === 'string' ? value.trim() : '';
@@ -88,6 +89,36 @@ function modeLabel(mode) {
 }
 
 return baseclass.extend({
+	loadConnections() {
+		// These share network.js's cached netifd/host snapshot with other widgets.
+		return Promise.all([
+			L.resolveDefault(network.getNetworks(), null),
+			L.resolveDefault(network.getHostHints(), null),
+			L.resolveDefault(network.getDevices(), [])
+		]).then(data => this.collectConnections(data));
+	},
+
+	collectConnections([ interfaces, hints, devices ]) {
+		const localMACs = new Set(devices.map(dev => dev.getMAC()?.toUpperCase()).filter(Boolean));
+		return {
+			interfaces: interfaces?.filter(net => net.getName() !== 'loopback' && net.getL3Device()?.getName() !== 'lo').map(net => {
+				const dev = net.getL3Device() || net.getDevice();
+				return {
+					id: net.getName(), name: net.getName(), device: dev?.getName() || '',
+					protocol: net.getProtocol(), type: dev?.getType() || '',
+					virtual: net.isVirtual(), up: net.isUp(),
+					addresses: net.getIPAddrs().concat(net.getIP6Addrs()),
+					members: (dev?.getPorts() || []).map(port => port.getName()),
+					gateways: [ net.getGatewayAddr(), net.getGateway6Addr() ].filter(value => value && value !== '0.0.0.0' && value !== '::')
+				};
+			}) || null,
+			hosts: hints ? Object.entries(hints.hosts || {}).filter(([ mac ]) => !localMACs.has(mac.toUpperCase())).map(([ mac, hint ]) => ({
+				mac: mac.toUpperCase(), name: hint.name || mac,
+				addresses: L.toArray(hint.ipaddrs || hint.ipv4).concat(L.toArray(hint.ip6addrs || hint.ipv6))
+			})).sort((a, b) => a.mac.localeCompare(b.mac)) : null
+		};
+	},
+
 	buildModel(snapshot) {
 		const source = snapshot || {};
 		const router = source.router || {};
@@ -106,7 +137,7 @@ return baseclass.extend({
 				continue;
 			groups.set('net:' + name, {
 				id: 'net:' + name, name: text(item.name) || name, icon: 'network',
-				kind: 'logical', relation: 'logical', tab: 'connections', network: name,
+				kind: 'logical', relation: 'logical', network: name,
 				context: text(item.device) || text(item.protocol), active: item.up === true,
 				members: [], wifiNetworks: [], errors: [], radios: 0
 			});
@@ -123,7 +154,7 @@ return baseclass.extend({
 				continue;
 			const id = device ? 'device:' + device : 'network:' + network;
 			if (!upstreams.has(id))
-				upstreams.set(id, { id, names: [], families: [], states: [], gateways: [], network, tab: 'connections', icon: 'internet' });
+				upstreams.set(id, { id, names: [], families: [], states: [], gateways: [], network, tab: 'internet', icon: 'internet' });
 			const up = upstreams.get(id);
 			if (network && !up.names.includes(network))
 				up.names.push(network);
@@ -201,7 +232,7 @@ return baseclass.extend({
 			const associated = radio.mode === 'mesh' ? item.associated === true : item.associated !== false;
 			group.members.push({
 				id, name: name && name !== '?' ? name : mac, icon: radio.ap ? clientIcon(name) : 'router',
-				tab: 'wifi', network: radio.id, mac, relation: associated ? 'observed' : 'unknown',
+				tab: 'dhcp', network: radio.id, mac, relation: associated ? 'observed' : 'unknown',
 				detail: associated ? [ ips[0]?.replace(/\/\d+$/, '') || mac, radio.band ].filter(Boolean).join(' · ') : _('Peer state unknown'),
 				context: [ radio.name, modeLabel(radio.mode), associated ? '' : _('Peer state unknown') ].filter(Boolean).join(' · ')
 			});
@@ -226,7 +257,7 @@ return baseclass.extend({
 				continue;
 			unplaced.set(mac, {
 				id: mac, mac, name: name && name !== '?' ? name : mac, detail: ips[0]?.replace(/\/\d+$/, '') || _('Attachment unknown'),
-				icon: clientIcon(item.name), tab: 'connections', relation: 'unknown', context: _('Attachment unknown')
+				icon: clientIcon(item.name), relation: 'unknown', context: _('Attachment unknown')
 			});
 		}
 

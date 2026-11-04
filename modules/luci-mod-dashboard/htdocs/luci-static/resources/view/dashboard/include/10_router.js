@@ -51,7 +51,7 @@ return baseclass.extend({
 		])));
 	},
 
-	renderInternetColumn(group) {
+	renderInternetColumn(group, network) {
 		const connected = group.connected.value === true;
 		const rows = [];
 
@@ -67,9 +67,9 @@ return baseclass.extend({
 			rows.push({ title: group[key].title, value: value });
 		}
 
-		return E('div', {}, [
+		return E('div', { 'data-dashboard-network': network }, [
 			E('h3', {}, [
-				group.title, ' ',
+				group.title, network ? ' · ' + network : '', ' ',
 				charts.badge(connected ? _('Connected') : _('Not connected'), connected ? 'success' : 'warning')
 			]),
 			connected ? this.renderKeyValueTable(rows) : charts.empty(_('Not configured or no address acquired'))
@@ -77,10 +77,19 @@ return baseclass.extend({
 	},
 
 	renderInternetTab() {
-		return E('div', {}, [
-			this.renderInternetColumn(this.params.internet.v4),
-			this.renderInternetColumn(this.params.internet.v6)
-		]);
+		this.internetNode = E('div', {}, [ 4, 6 ].flatMap(family => {
+			const networks = this.wanData[family === 4 ? 0 : 1];
+			return networks.length ? networks.map(net => {
+				const data = this.internetData(family === 4 ? [ [ net ], [] ] : [ [], [ net ] ]);
+				return this.renderInternetColumn(data['v' + family], net.getName());
+			}) : [ this.renderInternetColumn(this.params.internet['v' + family]) ];
+		}));
+		return this.internetNode;
+	},
+
+	navigate({ network }) {
+		return network ? Array.from(this.internetNode?.querySelectorAll('[data-dashboard-network]') || [])
+			.find(node => node.dataset.dashboardNetwork === network) : null;
 	},
 
 	renderSystemTab() {
@@ -119,7 +128,7 @@ return baseclass.extend({
 		});
 	},
 
-	renderUpdateWanData(data, v6) {
+	renderUpdateWanData(data, v6, internet) {
 
 		let min_metric = 2000000000;
 		let min_metric_i = 0;
@@ -135,28 +144,28 @@ return baseclass.extend({
 		if(ifc){
 			if (v6) {
 				const uptime = ifc.getUptime();
-				this.params.internet.v6.uptime.value = (uptime > 0) ? '%t'.format(uptime) : '-';
-				this.params.internet.v6.ipprefixv6.value =  ifc.getIP6Prefix() || '-';
-				this.params.internet.v6.gatewayv6.value =  ifc.getGateway6Addr() || '-';
-				this.params.internet.v6.protocol.value=  ifc.getI18n() || E('em', _('Not connected'));
-				this.params.internet.v6.addrsv6.value = ifc.getIP6Addrs() || [ '-' ];
-				this.params.internet.v6.dnsv6.value = ifc.getDNS6Addrs() || [ '-' ];
-				this.params.internet.v6.connected.value = ifc.isUp();
+				internet.v6.uptime.value = (uptime > 0) ? '%t'.format(uptime) : '-';
+				internet.v6.ipprefixv6.value =  ifc.getIP6Prefix() || '-';
+				internet.v6.gatewayv6.value =  ifc.getGateway6Addr() || '-';
+				internet.v6.protocol.value=  ifc.getI18n() || E('em', _('Not connected'));
+				internet.v6.addrsv6.value = ifc.getIP6Addrs() || [ '-' ];
+				internet.v6.dnsv6.value = ifc.getDNS6Addrs() || [ '-' ];
+				internet.v6.connected.value = ifc.isUp();
 			} else {
 				const uptime = ifc.getUptime();
-				this.params.internet.v4.uptime.value = (uptime > 0) ? '%t'.format(uptime) : '-';
-				this.params.internet.v4.protocol.value=  ifc.getI18n() || E('em', _('Not connected'));
-				this.params.internet.v4.gatewayv4.value =  ifc.getGatewayAddr() || '0.0.0.0';
-				this.params.internet.v4.connected.value = ifc.isUp();
-				this.params.internet.v4.addrsv4.value = ifc.getIPAddrs() || [ '-'];
-				this.params.internet.v4.dnsv4.value = ifc.getDNSAddrs() || [ '-' ];
+				internet.v4.uptime.value = (uptime > 0) ? '%t'.format(uptime) : '-';
+				internet.v4.protocol.value=  ifc.getI18n() || E('em', _('Not connected'));
+				internet.v4.gatewayv4.value =  ifc.getGatewayAddr() || '0.0.0.0';
+				internet.v4.connected.value = ifc.isUp();
+				internet.v4.addrsv4.value = ifc.getIPAddrs() || [ '-'];
+				internet.v4.dnsv4.value = ifc.getDNSAddrs() || [ '-' ];
 			}
 		}
 	},
 
-	renderInternetBox(data) {
+	internetData(data) {
 
-		this.params.internet = {
+		const internet = {
 
 			v4: {
 				title: _('IPv4 Internet'),
@@ -245,8 +254,9 @@ return baseclass.extend({
 			}
 		};
 
-		this.renderUpdateWanData(data[0], false);
-		this.renderUpdateWanData(data[1], true);
+		this.renderUpdateWanData(data[0], false, internet);
+		this.renderUpdateWanData(data[1], true, internet);
+		return internet;
 	},
 
 	renderRouterBox(data) {
@@ -350,7 +360,8 @@ return baseclass.extend({
 	},
 
 	render(data) {
-		this.renderInternetBox(data);
+		this.wanData = data.slice(0, 2);
+		this.params.internet = this.internetData(data);
 		this.renderRouterBox(data);
 		this.updateTopologyData(data);
 
