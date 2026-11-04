@@ -85,7 +85,15 @@ return baseclass.extend({
 		this.node.dataset.dashboardOverview = 'network-topology';
 		this.node.addEventListener('dashboard-topology-selection', ev => {
 			this.selection = ev.detail || {};
-			this.highlight();
+			if (this.selection.tab === 'wifi' && this.selection.network &&
+				(this.mobileNetwork !== this.selection.network || this.mobileCollapsed)) {
+				this.mobileNetwork = this.selection.network;
+				this.mobileCollapsed = false;
+				this.updateTree();
+			}
+			else {
+				this.highlight();
+			}
 		});
 		this.node.addEventListener('dashboard-topology-reveal', ev => {
 			const { network, client } = ev.detail || {};
@@ -93,6 +101,8 @@ return baseclass.extend({
 			if (index < 0)
 				return;
 			this.revealed = { network, client };
+			this.mobileNetwork = network;
+			this.mobileCollapsed = false;
 			this.networkLimit = Math.min(MAX_NETWORKS, Math.max(this.networkLimit, index + 1));
 			const branch = this.branches.get(network);
 			if (branch)
@@ -130,9 +140,11 @@ return baseclass.extend({
 		if (!branch) {
 			branch = { limit: PAGE_SIZE, collapsed: false };
 			branch.group = E('div', { 'class': 'dashboard-topology-group' });
-			branch.clients = E('ul', { 'class': 'dashboard-topology-clients' });
+			const clientsId = 'dashboard-topology-clients-' + encodeURIComponent(id);
+			branch.clients = E('ul', { 'class': 'dashboard-topology-clients', id: clientsId });
 			branch.toggle = E('button', {
 				type: 'button', 'class': 'dashboard-topology-toggle',
+				'aria-controls': clientsId,
 				click: () => {
 					if (this.revealed?.network === id)
 						this.revealed = null;
@@ -140,6 +152,27 @@ return baseclass.extend({
 					this.updateTree();
 				}
 			});
+			// Mobile controls choose one client group; desktop controls collapse
+			// individual branches of the full tree.
+			branch.mobileToggle = E('button', {
+				type: 'button', 'class': 'dashboard-topology-mobile-toggle',
+				'aria-controls': clientsId,
+				click: () => {
+					this.mobileCollapsed = branch.item.hasAttribute('data-mobile-open');
+					this.mobileNetwork = id;
+					branch.collapsed = false;
+					this.updateTree();
+				}
+			});
+			branch.mobileLabel = E('span');
+			branch.mobileDetails = E('button', {
+				type: 'button', 'class': 'dashboard-topology-link',
+				'data-dashboard-tab': 'wifi', 'data-dashboard-network': id,
+				'data-dashboard-section': 'clients'
+			}, _('View details'));
+			branch.mobileHeading = E('div', { 'class': 'dashboard-topology-mobile-heading' }, [
+				branch.mobileLabel, branch.mobileDetails
+			]);
 			branch.more = E('button', {
 				type: 'button', 'class': 'dashboard-topology-link',
 				click: () => {
@@ -153,7 +186,7 @@ return baseclass.extend({
 				}
 			});
 			branch.moreItem = E('li', { 'class': 'dashboard-topology-leaf dashboard-topology-more' }, branch.more);
-			branch.item = E('li', { 'class': 'dashboard-topology-branch' }, [ branch.group, branch.clients ]);
+			branch.item = E('li', { 'class': 'dashboard-topology-branch' }, [ branch.group, branch.mobileHeading, branch.clients ]);
 			this.branches.set(id, branch);
 		}
 		return branch;
@@ -185,12 +218,14 @@ return baseclass.extend({
 
 		let remaining = MAX_CLIENTS;
 		let rows = 0;
-		let mobileRows = 0;
-		let mobileGroups = 0;
 		const visibleNetworks = model.networks.slice(0, this.networkLimit);
 		const revealedNetwork = model.networks.find(net => net.id === this.revealed?.network);
 		if (revealedNetwork && !visibleNetworks.includes(revealedNetwork))
 			visibleNetworks[visibleNetworks.length - 1] = revealedNetwork;
+		if (!visibleNetworks.some(net => net.id === this.mobileNetwork)) {
+			this.mobileNetwork = (visibleNetworks.find(net => net.clients.length) || visibleNetworks[0])?.id;
+			this.mobileCollapsed = false;
+		}
 		// Reserve space for an explicitly requested client beyond ordinary pages.
 		let reserved = !!revealedNetwork;
 		const branchNodes = visibleNetworks.map((net, index) => {
@@ -202,12 +237,21 @@ return baseclass.extend({
 			}, live);
 			attr(branch.item, 'data-network', net.id);
 			attr(branch.item, 'data-has-clients', net.clients.length ? 'true' : null);
+			const mobileOpen = this.mobileNetwork === net.id && !this.mobileCollapsed && !branch.collapsed && net.clients.length > 0;
+			attr(branch.item, 'data-mobile-open', mobileOpen ? 'true' : null);
+			attr(branch.item, 'style', '--topology-mobile-column:' + (index % 2 + 1) +
+				';--topology-mobile-row:' + (Math.floor(index / 2) + 1));
 			attr(group, 'data-active', net.active ? 'true' : 'false');
 			text(branch.toggle, branch.collapsed ? '+' : '−');
 			attr(branch.toggle, 'aria-expanded', String(!branch.collapsed));
 			attr(branch.toggle, 'aria-label', (branch.collapsed ? _('Expand %s') : _('Collapse %s')).format(net.name));
 			branch.toggle.hidden = !net.clients.length;
-			reconcile(branch.group, [ group, branch.toggle ]);
+			attr(branch.mobileToggle, 'aria-expanded', String(mobileOpen));
+			attr(branch.mobileToggle, 'aria-label', (mobileOpen ? _('Collapse %s') : _('Expand %s')).format(net.name + ' · ' + net.detail));
+			branch.mobileToggle.hidden = !net.clients.length;
+			text(branch.mobileLabel, net.detail);
+			attr(branch.clients, 'aria-label', net.name + ' · ' + net.detail);
+			reconcile(branch.group, [ group, branch.toggle, branch.mobileToggle ]);
 
 			if (net === revealedNetwork)
 				reserved = false;
@@ -244,18 +288,15 @@ return baseclass.extend({
 			// Fixed-height slots provide connector geometry without reading layout.
 			branch.rowStart = rows;
 			branch.rowCount = Math.max(1, items.length);
-			branch.mobileStartRows = mobileRows;
-			branch.mobileStartGroups = mobileGroups;
 			branch.index = index;
 			branch.visibleClients = shown.map(client => client.mac);
 			rows += branch.rowCount;
-			mobileRows += 1 + items.length;
-			mobileGroups += items.length ? 1 : 0;
 			reconcile(branch.clients, items);
 			branch.clients.hidden = !items.length;
 			return branch.item;
 		});
 		this.rowCount = rows;
+		this.networkRows = Math.ceil(visibleNetworks.length / 2);
 		reconcile(this.networks, branchNodes);
 		this.networks.hidden = !model.networks.length;
 		attr(this.node, 'data-has-networks', model.networks.length ? 'true' : null);
@@ -310,8 +351,7 @@ return baseclass.extend({
 		attr(this.networks, 'style', '--topology-first:' + ((first?.rowCount - 1) / 2 || 0) +
 			';--topology-last:' + ((last?.rowCount - 1) / 2 || 0) +
 			';--topology-path-start:' + Math.min(midpoint, target) + ';--topology-path-length:' + Math.abs(midpoint - target) +
-			';--topology-mobile-end-rows:' + (last?.mobileStartRows || 0) + ';--topology-mobile-end-groups:' + (last?.mobileStartGroups || 0) +
-			';--topology-mobile-path-rows:' + (selectedBranch?.mobileStartRows || 0) + ';--topology-mobile-path-groups:' + (selectedBranch?.mobileStartGroups || 0));
+			';--topology-mobile-network-rows:' + this.networkRows);
 		this.networks.classList.toggle('dashboard-topology-selected', !!selectedBranch);
 		this.upstreams.classList.toggle('dashboard-topology-selected', !!selectedBranch);
 		this.router.classList.toggle('dashboard-topology-selected', !!selectedBranch);
