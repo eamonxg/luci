@@ -281,7 +281,7 @@ function startPolling(includes, layout, root, form) {
 		const offset = frame.node === window ? window.scrollY : frame.node.scrollTop;
 		frame.node.scrollTo({ top: Math.max(0, offset + top - frame.top - 16), behavior: 'auto' });
 	};
-	const topologyTarget = ({ network, client }) => Array.from(root.querySelectorAll('[data-dashboard-overview] [data-dashboard-tab="wifi"]'))
+	const topologyTarget = ({ network, client }) => Array.from(root.querySelectorAll('[data-dashboard-overview] [data-dashboard-network]'))
 		.find(link => (link.dataset.dashboardNetwork || null) === (network || null) &&
 			(link.dataset.dashboardClient || null) === (client || null));
 	const showTopology = location => {

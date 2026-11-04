@@ -25,7 +25,7 @@ test('APs on the same logical LAN share a group while association identity stays
 	const model = topology.buildModel(snapshot([radio('ap0'), radio('ap1', ['lan'], { band: '2.4 GHz' })], [station('ap0', 1), station('ap1', 1)]));
 	assert.equal(model.groups.length, 1);
 	assert.equal(model.groups[0].id, 'net:lan');
-	assert.equal(model.groups[0].tab, 'connections');
+	assert.equal(model.groups[0].tab, undefined);
 	assert.equal(model.groups[0].members.length, 2);
 	assert.notEqual(model.groups[0].members[0].id, model.groups[0].members[1].id);
 	assert.deepEqual(model.groups[0].wifiNetworks, ['ap0', 'ap1']);
@@ -150,22 +150,22 @@ test('selection follows a reported VLAN reassignment and clamps to the selected 
 });
 
 test('interface collection exposes reported bridge members and excludes local host MACs', () => {
-	const connections = module('include/16_connections.js', { L:{toArray:v=>v==null?[]:Array.isArray(v)?v:[v]} });
+	const collector = module('lib/topology.js', { L:{toArray:v=>v==null?[]:Array.isArray(v)?v:[v]} });
 	const dev = {getName:()=> 'br-lan',getType:()=> 'bridge',getPorts:()=>[{getName:()=> 'lan1'}]};
 	const net = {getName:()=> 'lan',getL3Device:()=>dev,getDevice:()=>dev,getProtocol:()=> 'static',isVirtual:()=>false,isUp:()=>true,getIPAddrs:()=>['192.0.2.1/24'],getIP6Addrs:()=>['fd00::1/64'],getGatewayAddr:()=>null,getGateway6Addr:()=>null};
-	connections.updateData([[net],{hosts:{'02:00:00:00:00:01':{name:'self'},'02:00:00:00:00:02':{name:'host',ipaddrs:['192.0.2.2']}}},[{getMAC:()=> '02:00:00:00:00:01'}]]);
-	assert.deepEqual(connections.data.interfaces[0].members,['lan1']);
-	assert.deepEqual(connections.data.interfaces[0].addresses,['192.0.2.1/24','fd00::1/64']);
-	assert.equal(connections.data.hosts.length,1);
-	assert.equal(connections.data.hosts[0].name,'host');
+	const data = collector.collectConnections([[net],{hosts:{'02:00:00:00:00:01':{name:'self'},'02:00:00:00:00:02':{name:'host',ipaddrs:['192.0.2.2']}}},[{getMAC:()=> '02:00:00:00:00:01'}]]);
+	assert.deepEqual(data.interfaces[0].members,['lan1']);
+	assert.deepEqual(data.interfaces[0].addresses,['192.0.2.1/24','fd00::1/64']);
+	assert.equal(data.hosts.length,1);
+	assert.equal(data.hosts[0].name,'host');
 });
 
 test('failed interface and host collection remains unavailable', async () => {
 	const fail = async()=>{throw new Error('denied');};
-	const connections = module('include/16_connections.js', { network:{getNetworks:fail,getHostHints:fail,getDevices:fail},L:{resolveDefault:(p,v)=>p.catch(()=>v)} });
-	connections.updateData(await connections.load());
-	assert.equal(connections.data.interfaces,null);
-	assert.equal(connections.data.hosts,null);
+	const collector = module('lib/topology.js', { network:{getNetworks:fail,getHostHints:fail,getDevices:fail},L:{resolveDefault:(p,v)=>p.catch(()=>v)} });
+	const data = await collector.loadConnections();
+	assert.equal(data.interfaces,null);
+	assert.equal(data.hosts,null);
 });
 
 test('mesh without counters or confirmed peer state does not turn missing values into zero', () => {
@@ -185,4 +185,154 @@ test('optional wireless charts do not turn failed collection into no clients', (
 	wifi.params={wifi:{radios:[{clientsKnown:false}],devices:[]}};
 	for(const method of ['renderDistributionChart','renderSignalChart','renderTrafficChart'])
 		assert.equal(wifi[method]().body,'Wireless association data unavailable.');
+});
+
+
+test('topology supplies existing destinations even when saved tabs omit them', async () => {
+	const stored = { cards: [], charts: ['network_path_preview'], tabs: ['resources', 'connections', 'resources'] };
+	const widgets = module('lib/widgets.js', {
+		uci: { load: async () => {}, get: (config, section, slot) => stored[slot] },
+		L: { toArray: value => value || [], resolveDefault: promise => promise }
+	});
+	const widget = module('include/15_network_path_preview.js');
+	const includes = [widget, { widgets: ['internet', 'system', 'dhcp', 'wifi', 'resources'].map(id => ({ id, slot: 'tabs' })) }];
+	const layout = await widgets.layout(includes);
+	assert.deepEqual(layout.tabs, ['resources', 'internet', 'system', 'dhcp', 'wifi']);
+	assert.deepEqual(stored.tabs, ['resources', 'connections', 'resources']);
+	assert.deepEqual(widgets.resolveLayout(includes, widgets.configuredLayout(includes)), layout);
+	assert.deepEqual(widgets.resolveLayout(includes, layout), layout);
+	assert.deepEqual(widgets.resolveLayout(includes, { ...layout, charts: [], tabs: ['resources'] }).tabs, ['resources']);
+	const wiredOnly = [widget, { widgets: ['internet', 'system'].map(id => ({ id, slot: 'tabs' })) }];
+	assert.deepEqual(widgets.resolveLayout(wiredOnly, { cards: [], charts: ['network_path_preview'], tabs: [] }).tabs, ['internet', 'system']);
+});
+
+test('group clicks toggle children without selecting a detail destination; reveal reopens the right page', () => {
+	const widget = module('include/15_network_path_preview.js', { topology, document: { activeElement: null } });
+	widget.init = () => {};
+	widget.updateTree = () => {};
+	widget.pages = new Map();
+	widget.selection = {};
+	widget.updateTopology(snapshot([radio('ap0')], Array.from({ length: 9 }, (_, i) => station('ap0', i + 1))));
+	widget.toggleGroup('net:lan');
+	assert.equal(widget.activeGroup, 'net:lan');
+	assert.equal(widget.collapsed, false);
+	widget.toggleGroup('net:lan');
+	assert.equal(widget.collapsed, true);
+	widget.updateTopology(snapshot([radio('ap0')], Array.from({ length: 9 }, (_, i) => station('ap0', i + 1))));
+	assert.equal(widget.collapsed, true);
+	widget.select({ tab: 'wifi', network: 'ap0', client: station('ap0', 9).mac });
+	assert.equal(widget.collapsed, false);
+	assert.equal(widget.activeGroup, 'net:lan');
+	assert.equal(widget.pages.get('net:lan'), 2);
+	widget.toggleGroup('net:guest');
+	assert.equal(widget.activeGroup, 'net:lan');
+	assert.equal(widget.collapsed, false);
+	assert.equal(widget.selection.client, station('ap0', 9).mac);
+});
+
+test('upstreams use Internet and unplaced records do not link to unrelated details', () => {
+	const model = topology.buildModel(snapshot([], [], {
+		router: { upstreams: [{ family: 4, network: 'wan', device: 'eth0', up: true }] },
+		connections: { interfaces: [lan], hosts: [station('unused', 1)] }
+	}));
+	assert.equal(model.upstreams[0].tab, 'internet');
+	assert.equal(model.upstreams[0].network, 'wan');
+	assert.equal(model.unplaced[0].tab, undefined);
+});
+
+test('Internet details include every WAN while the KPI retains the lowest metric route', () => {
+	const router = module('include/10_router.js', {
+		rpc: { declare: () => {} }, E: (tag, attributes, children) => ({ tag, attributes, children })
+	});
+	const net = (name, metric) => ({
+		getName: () => name, getMetric: () => metric, getUptime: () => 0,
+		getI18n: () => 'DHCP', getGatewayAddr: () => name + '-gateway',
+		getIPAddrs: () => [name + '-address'], getDNSAddrs: () => [], isUp: () => true
+	});
+	router.wanData = [[net('wan', 10), net('lte', 20)], []];
+	router.params = { internet: router.internetData(router.wanData) };
+	router.renderInternetColumn = (group, name) => ({ name, gateway: group.gatewayv4?.value });
+	const content = router.renderInternetTab();
+	assert.deepEqual(content.children.slice(0, 2), [{ name: 'wan', gateway: 'wan-gateway' }, { name: 'lte', gateway: 'lte-gateway' }]);
+	assert.equal(router.params.internet.v4.gatewayv4.value, 'wan-gateway');
+	const destinations = [{ dataset: { dashboardNetwork: 'wan' } }, { dataset: { dashboardNetwork: 'lte' } }];
+	router.internetNode = { querySelectorAll: () => destinations };
+	assert.equal(router.navigate({ network: 'lte' }), destinations[1]);
+});
+
+
+test('Settings displays the same enabled detail tabs as topology navigation', async () => {
+	const uci = { get: (config, section, slot) => ({ charts: ['network_path_preview'], tabs: ['resources'] })[slot] };
+	const L = { toArray: value => value || [] };
+	const widgets = module('lib/widgets.js', { uci, L });
+	const includes = [module('include/15_network_path_preview.js'), {
+		widgets: ['resources', 'internet', 'system', 'dhcp', 'wifi'].map(id => ({ id, title: id, slot: 'tabs' }))
+	}];
+	const options = {};
+	const form = { Map: class {
+		section() { return { option(type, slot) { return options[slot] = { value() {} }; } }; }
+		render() { return Promise.resolve({}); }
+	} };
+	const layout = module('lib/layout.js', {
+		form, widgets, L, ui: { createHandlerFn: () => () => {} },
+		E: (tag, attrs, children) => ({ tag, attrs, children })
+	});
+	await layout.render(includes);
+	assert.deepEqual(options.tabs.cfgvalue(), ['resources', 'internet', 'system', 'dhcp', 'wifi']);
+	assert.deepEqual(options.charts.cfgvalue(), ['network_path_preview']);
+});
+
+
+const clientView = (dependencies = {}) => module('include/20_lan.js', {
+	rpc: { declare: () => async () => ({}) },
+	L: { toArray: value => value == null ? [] : Array.isArray(value) ? value : [value], resolveDefault: (promise, fallback) => promise.catch(() => fallback) },
+	E: (tag, attributes, children) => ({ tag, attributes, children }), ...dependencies
+});
+
+test('Clients merges records by MAC, ranks reported wireless first, and excludes router addresses', () => {
+	const view = clientView();
+	view.render([{ dhcp_leases: [{ macaddr: station('', 2).mac, hostname: 'Lease', ipaddr: '192.0.2.2' }] }, { hosts: {
+		[station('', 1).mac]: { name: 'WiFi', ipaddrs: ['192.0.2.1'] },
+		[station('', 2).mac]: { name: 'Hint', ipaddrs: ['192.0.2.2'], ip6addrs: ['fd00::2'] },
+		[station('', 3).mac]: { name: 'Record', ipaddrs: ['192.0.2.3'] },
+		[station('', 4).mac]: { name: 'Router', ipaddrs: ['192.0.2.254'] }
+	} }, [{ getMAC: () => station('', 4).mac }]]);
+	const clients = view.buildClients({ networks: [radio('ap0')], clients: [station('ap0', 1)] });
+	assert.deepEqual(clients.map(client => client.mac), [station('', 1).mac, station('', 2).mac, station('', 3).mac]);
+	assert.equal(clients[0].associations[0].network, 'ap0');
+	assert.equal(clients[1].lease, true);
+	assert.deepEqual(clients[1].addresses, ['192.0.2.2', 'fd00::2']);
+	assert.deepEqual(clients[2].associations, []);
+	assert.equal(clients[2].lease, false);
+});
+
+test('failed wireless reads and unconfirmed peers do not become active associations in Clients', () => {
+	const view = clientView();
+	view.params = { lan: { devices: [] } };
+	view.devices = [];
+	const clients = view.buildClients({ networks: [radio('ap0', ['lan'], {clientsKnown:false}), radio('mesh0', [], {mode:'mesh'})], clients: [station('ap0', 1), station('mesh0', 2, {associated:false})] });
+	assert.equal(clients.length, 1);
+	assert.equal(clients[0].associations[0].known, false);
+});
+
+test('Clients remains available without DHCP and preserves independent successful host reads', async () => {
+	const view = clientView({ network: { getHostHints: async () => ({hosts:{ [station('', 1).mac]: {name:'Host'} }}), getDevices: async () => [] }, rpc:{declare:()=>async()=>{throw Error('unsupported');}} });
+	view.render(await view.load());
+	assert.equal(view.clientRows.length, 1);
+	assert.equal(view.clientRows[0].lease, false);
+});
+
+test('topology navigation clears client search and selects the page containing the exact device', () => {
+	const view = clientView({ charts: {
+		badge: label => label,
+		table: options => ({ querySelectorAll: () => options.rowAttrs.map(attrs => ({dataset:{ dashboardClientRow:attrs['data-dashboard-client-row'], dashboardNetwork:attrs['data-dashboard-network'] }})) })
+	} });
+	view.clientRows = Array.from({length:30}, (_, index) => ({ ...station('ap0', index + 1), lease:false, associations:[] }));
+	view.query = 'missing';
+	view.search = {value:'missing'};
+	const target = view.navigate({client:station('ap0', 29).mac,network:null});
+	assert.equal(view.query, '');
+	assert.equal(view.search.value, '');
+	assert.equal(view.page, 2);
+	assert.equal(target.dataset.dashboardClientRow, station('ap0', 29).mac);
 });
