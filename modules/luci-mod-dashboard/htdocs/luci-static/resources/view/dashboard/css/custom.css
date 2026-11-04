@@ -705,3 +705,6 @@
 		--dashboard-plot-h: 140px;
 	}
 }
+
+/* Dependent detail tabs stay enabled while their topology widget is shown. */
+.dashboard-widget-list > .item.dashboard-required-tab::after { display: none; }
