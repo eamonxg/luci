@@ -48,7 +48,8 @@ return baseclass.extend({
 		if (!document.querySelector('link[data-dashboard-topology-style]'))
 			document.head.appendChild(E('link', {
 				rel: 'stylesheet', 'data-dashboard-topology-style': '',
-				href: L.resource('view/dashboard/css/network-path-preview.css')
+				href: L.resource('view/dashboard/css/network-path-preview.css') +
+					(L.env.resource_version ? '?v=' + L.env.resource_version : '')
 			}));
 		this.nodes = new Map();
 		this.branches = new Map();
