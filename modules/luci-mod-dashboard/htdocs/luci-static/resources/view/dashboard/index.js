@@ -289,7 +289,7 @@ function startPolling(includes, layout, root, form) {
 		if (!overview)
 			return;
 		overview.dispatchEvent(new CustomEvent('dashboard-topology-reveal', { detail: location || {} }));
-		const target = topologyTarget(location);
+		const target = topologyTarget(location) || overview.querySelector('.dashboard-topology-node[aria-current="true"]');
 		if (target?.isConnected)
 			target.focus({ preventScroll: true });
 		const frame = scrollFrame(target?.isConnected ? target : overview);
