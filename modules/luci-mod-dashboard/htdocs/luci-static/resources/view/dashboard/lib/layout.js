@@ -63,6 +63,8 @@ return baseclass.extend({
 				return;
 
 			const o = lists[slot] = s.option(form.DynamicList, slot, slots[slot]);
+			if (slot === 'tabs')
+				o.description = _('Network topology automatically shows the detail tabs available on this device.');
 
 			choices.forEach(widget => o.value(widget.id, widget.title));
 

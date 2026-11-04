@@ -37,6 +37,21 @@ return baseclass.extend({
 		return this.list(includes, slot).filter(widget => !widget.hidden).map(widget => widget.id);
 	},
 
+	// Navigation from a visible widget must not depend on the saved tab list.
+	// Only add destinations supplied by includes available on this device;
+	// rendering still omits tabs whose data could not be loaded.
+	resolveLayout(includes, layout) {
+		const resolved = Object.fromEntries(SLOTS.map(slot => [ slot, layout[slot].slice() ]));
+		const knownTabs = new Set(this.list(includes, 'tabs').map(widget => widget.id));
+		for (const include of includes)
+			for (const widget of include.widgets || [])
+				if (resolved[widget.slot]?.includes(widget.id))
+					for (const id of widget.detailTabs || [])
+						if (knownTabs.has(id) && !resolved.tabs.includes(id))
+							resolved.tabs.push(id);
+		return resolved;
+	},
+
 	// The ids to show in each slot, in display order. A slot that is not
 	// configured shows its defaults: UCI cannot store an empty list, so
 	// emptying one brings them back. Ids this device does not know, from
@@ -54,7 +69,7 @@ return baseclass.extend({
 				layout[slot] = ids.length ? ids : this.defaults(includes, slot);
 			});
 
-			return layout;
+			return this.resolveLayout(includes, layout);
 		});
 	}
 });
