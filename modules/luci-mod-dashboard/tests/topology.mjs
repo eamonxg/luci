@@ -197,7 +197,8 @@ test('topology supplies existing destinations even when saved tabs omit them', a
 	const widget = module('include/15_network_path_preview.js');
 	const includes = [widget, { widgets: ['internet', 'system', 'dhcp', 'wifi', 'resources'].map(id => ({ id, slot: 'tabs' })) }];
 	const layout = await widgets.layout(includes);
-	assert.deepEqual(layout.tabs, ['resources', 'internet', 'system', 'dhcp', 'wifi']);
+	assert.deepEqual(layout.tabs, ['resources', 'internet', 'system', 'wifi']);
+	assert.deepEqual(widgets.resolveLayout(includes, { ...layout, tabs: ['dhcp'] }).tabs, ['dhcp', 'internet', 'system', 'wifi']);
 	assert.deepEqual(stored.tabs, ['resources', 'connections', 'resources']);
 	assert.deepEqual(widgets.resolveLayout(includes, widgets.configuredLayout(includes)), layout);
 	assert.deepEqual(widgets.resolveLayout(includes, layout), layout);
@@ -278,61 +279,25 @@ test('Settings displays the same enabled detail tabs as topology navigation', as
 		E: (tag, attrs, children) => ({ tag, attrs, children })
 	});
 	await layout.render(includes);
-	assert.deepEqual(options.tabs.cfgvalue(), ['resources', 'internet', 'system', 'dhcp', 'wifi']);
+	assert.deepEqual(options.tabs.cfgvalue(), ['resources', 'internet', 'system', 'wifi']);
 	assert.deepEqual(options.charts.cfgvalue(), ['network_path_preview']);
 });
 
 
-const clientView = (dependencies = {}) => module('include/20_lan.js', {
-	rpc: { declare: () => async () => ({}) },
-	L: { toArray: value => value == null ? [] : Array.isArray(value) ? value : [value], resolveDefault: (promise, fallback) => promise.catch(() => fallback) },
-	E: (tag, attributes, children) => ({ tag, attributes, children }), ...dependencies
+test('topology clients open their existing Wireless association details without requiring a lease', () => {
+	const model = topology.buildModel(snapshot([radio('ap0'), radio('ap1')], [station('ap0', 1), station('ap1', 1)]));
+	assert.deepEqual(model.groups[0].members.map(member => [member.tab, member.network, member.mac]), [
+		['wifi', 'ap0', station('ap0', 1).mac], ['wifi', 'ap1', station('ap1', 1).mac]
+	]);
 });
 
-test('Clients merges records by MAC, ranks reported wireless first, and excludes router addresses', () => {
-	const view = clientView();
-	view.render([{ dhcp_leases: [{ macaddr: station('', 2).mac, hostname: 'Lease', ipaddr: '192.0.2.2' }] }, { hosts: {
-		[station('', 1).mac]: { name: 'WiFi', ipaddrs: ['192.0.2.1'] },
-		[station('', 2).mac]: { name: 'Hint', ipaddrs: ['192.0.2.2'], ip6addrs: ['fd00::2'] },
-		[station('', 3).mac]: { name: 'Record', ipaddrs: ['192.0.2.3'] },
-		[station('', 4).mac]: { name: 'Router', ipaddrs: ['192.0.2.254'] }
-	} }, [{ getMAC: () => station('', 4).mac }]]);
-	const clients = view.buildClients({ networks: [radio('ap0')], clients: [station('ap0', 1)] });
-	assert.deepEqual(clients.map(client => client.mac), [station('', 1).mac, station('', 2).mac, station('', 3).mac]);
-	assert.equal(clients[0].associations[0].network, 'ap0');
-	assert.equal(clients[1].lease, true);
-	assert.deepEqual(clients[1].addresses, ['192.0.2.2', 'fd00::2']);
-	assert.deepEqual(clients[2].associations, []);
-	assert.equal(clients[2].lease, false);
-});
 
-test('failed wireless reads and unconfirmed peers do not become active associations in Clients', () => {
-	const view = clientView();
-	view.params = { lan: { devices: [] } };
-	view.devices = [];
-	const clients = view.buildClients({ networks: [radio('ap0', ['lan'], {clientsKnown:false}), radio('mesh0', [], {mode:'mesh'})], clients: [station('ap0', 1), station('mesh0', 2, {associated:false})] });
-	assert.equal(clients.length, 1);
-	assert.equal(clients[0].associations[0].known, false);
-});
-
-test('Clients remains available without DHCP and preserves independent successful host reads', async () => {
-	const view = clientView({ network: { getHostHints: async () => ({hosts:{ [station('', 1).mac]: {name:'Host'} }}), getDevices: async () => [] }, rpc:{declare:()=>async()=>{throw Error('unsupported');}} });
-	view.render(await view.load());
-	assert.equal(view.clientRows.length, 1);
-	assert.equal(view.clientRows[0].lease, false);
-});
-
-test('topology navigation clears client search and selects the page containing the exact device', () => {
-	const view = clientView({ charts: {
-		badge: label => label,
-		table: options => ({ querySelectorAll: () => options.rowAttrs.map(attrs => ({dataset:{ dashboardClientRow:attrs['data-dashboard-client-row'], dashboardNetwork:attrs['data-dashboard-network'] }})) })
-	} });
-	view.clientRows = Array.from({length:30}, (_, index) => ({ ...station('ap0', index + 1), lease:false, associations:[] }));
-	view.query = 'missing';
-	view.search = {value:'missing'};
-	const target = view.navigate({client:station('ap0', 29).mac,network:null});
-	assert.equal(view.query, '');
-	assert.equal(view.search.value, '');
-	assert.equal(view.page, 2);
-	assert.equal(target.dataset.dashboardClientRow, station('ap0', 29).mac);
+test('the original DHCP tab remains available when lease data exists without service feature flags', async () => {
+	for (const available of [true, false]) {
+		const dhcp = module('include/20_lan.js', {
+			rpc: { declare: () => async () => { if (!available) throw new Error('unsupported'); return {dhcp_leases:[]}; } },
+			L: { hasSystemFeature: () => false, resolveDefault: (promise, fallback) => promise.catch(() => fallback) }
+		});
+		assert.equal(await dhcp.available(), available);
+	}
 });

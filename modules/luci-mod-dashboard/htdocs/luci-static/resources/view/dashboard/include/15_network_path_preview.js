@@ -32,7 +32,7 @@ function reconcile(parent, children) {
 return baseclass.extend({
 	widgets: [ {
 		id: 'network_path_preview', slot: 'charts', title: _('Network topology'), order: 5,
-		detailTabs: [ 'internet', 'system', 'dhcp', 'wifi' ]
+		detailTabs: [ 'internet', 'system', 'wifi' ]
 	} ],
 	dataSources: [ 'router', 'wifi' ],
 	topologySource: 'connections',
@@ -172,7 +172,7 @@ return baseclass.extend({
 		attr(node.button, 'aria-controls', expandable ? this.endpoints.id : null);
 		attr(node.button, 'data-dashboard-network', data.network);
 		attr(node.button, 'data-dashboard-client', data.mac);
-		attr(node.button, 'data-dashboard-section', !expandable && [ 'wifi', 'dhcp' ].includes(data.tab) ? (data.mac ? 'clients' : 'networks') : null);
+		attr(node.button, 'data-dashboard-section', !expandable && data.tab === 'wifi' ? (data.mac ? 'clients' : 'networks') : null);
 		attr(node.button, 'data-active', data.active === false || data.relation === 'unknown' ? 'false' : null);
 		attr(node.button, 'aria-current', selected ? 'true' : null);
 		const description = [ data.detail, data.mac ? data.context : null ].filter(Boolean).join(' · ');
