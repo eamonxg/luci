@@ -232,7 +232,7 @@ return baseclass.extend({
 			const associated = radio.mode === 'mesh' ? item.associated === true : item.associated !== false;
 			group.members.push({
 				id, name: name && name !== '?' ? name : mac, icon: radio.ap ? clientIcon(name) : 'router',
-				tab: 'dhcp', network: radio.id, mac, relation: associated ? 'observed' : 'unknown',
+				tab: 'wifi', network: radio.id, mac, relation: associated ? 'observed' : 'unknown',
 				detail: associated ? [ ips[0]?.replace(/\/\d+$/, '') || mac, radio.band ].filter(Boolean).join(' · ') : _('Peer state unknown'),
 				context: [ radio.name, modeLabel(radio.mode), associated ? '' : _('Peer state unknown') ].filter(Boolean).join(' · ')
 			});
