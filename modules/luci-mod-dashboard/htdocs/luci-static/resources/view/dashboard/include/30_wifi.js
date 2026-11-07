@@ -242,6 +242,7 @@ return baseclass.extend({
 		return {
 			networks: radios.map(radio => ({
 				id: radio.network,
+				device: radio.device,
 				name: radio.ssid.value,
 				band: radio.band,
 				mode: radio.mode,
@@ -469,6 +470,7 @@ return baseclass.extend({
 				this.params.wifi.radios.push(
 					{
 						network: net.getName(),
+						device: net.getIfname(),
 						mode: net.getMode(),
 						interfaces: net.getNetworkNames(),
 						clientsKnown: net.assoclistKnown,
