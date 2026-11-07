@@ -4,6 +4,7 @@ import { readfile } from 'fs';
 import * as uloop from 'uloop';
 import { connect } from 'ubus';
 import { start as start_temperature } from 'luci.dashboard.temperature';
+import { collect as collect_topology } from 'luci.dashboard.topology';
 
 const STEP = 5000, SLOTS = 60;
 
@@ -120,6 +121,12 @@ function tick() {
 timer = uloop.timer(0, tick);
 
 const methods = {
+	topology: {
+		args: {},
+		call: function() {
+			return collect_topology();
+		}
+	},
 	history: {
 		args: { since: 0, id: 'id' },
 		call: function(request) {

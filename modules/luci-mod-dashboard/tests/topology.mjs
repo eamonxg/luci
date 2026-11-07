@@ -8,7 +8,7 @@ String.prototype.format = function(...values) {
 	return this.replace(/%[sd]/g, () => String(values[index++]));
 };
 function module(path, dependencies = {}) {
-	const context = { baseclass: { extend: value => value }, _: value => value, ...dependencies };
+	const context = { baseclass: { extend: value => value }, _: value => value, rpc: { declare: () => async () => null }, ...dependencies };
 	return new Function(...Object.keys(context), readFileSync(new URL(path, directory), 'utf8'))(...Object.values(context));
 }
 const topology = module('lib/topology.js');
@@ -197,14 +197,14 @@ test('topology supplies existing destinations even when saved tabs omit them', a
 	const widget = module('include/15_network_path_preview.js');
 	const includes = [widget, { widgets: ['internet', 'system', 'dhcp', 'wifi', 'resources'].map(id => ({ id, slot: 'tabs' })) }];
 	const layout = await widgets.layout(includes);
-	assert.deepEqual(layout.tabs, ['resources', 'internet', 'system', 'wifi']);
-	assert.deepEqual(widgets.resolveLayout(includes, { ...layout, tabs: ['dhcp'] }).tabs, ['dhcp', 'internet', 'system', 'wifi']);
+	assert.deepEqual(layout.tabs, ['resources', 'connections', 'internet', 'system', 'wifi']);
+	assert.deepEqual(widgets.resolveLayout(includes, { ...layout, tabs: ['dhcp'] }).tabs, ['dhcp', 'internet', 'system', 'wifi', 'connections']);
 	assert.deepEqual(stored.tabs, ['resources', 'connections', 'resources']);
 	assert.deepEqual(widgets.resolveLayout(includes, widgets.configuredLayout(includes)), layout);
 	assert.deepEqual(widgets.resolveLayout(includes, layout), layout);
 	assert.deepEqual(widgets.resolveLayout(includes, { ...layout, charts: [], tabs: ['resources'] }).tabs, ['resources']);
 	const wiredOnly = [widget, { widgets: ['internet', 'system'].map(id => ({ id, slot: 'tabs' })) }];
-	assert.deepEqual(widgets.resolveLayout(wiredOnly, { cards: [], charts: ['network_path_preview'], tabs: [] }).tabs, ['internet', 'system']);
+	assert.deepEqual(widgets.resolveLayout(wiredOnly, { cards: [], charts: ['network_path_preview'], tabs: [] }).tabs, ['internet', 'system', 'connections']);
 });
 
 test('group clicks toggle children without selecting a detail destination; reveal reopens the right page', () => {
@@ -212,6 +212,7 @@ test('group clicks toggle children without selecting a detail destination; revea
 	widget.init = () => {};
 	widget.updateTree = () => {};
 	widget.pages = new Map();
+	widget.closedAccess = new Set();
 	widget.selection = {};
 	widget.updateTopology(snapshot([radio('ap0')], Array.from({ length: 9 }, (_, i) => station('ap0', i + 1))));
 	widget.toggleGroup('net:lan');
@@ -224,7 +225,7 @@ test('group clicks toggle children without selecting a detail destination; revea
 	widget.select({ tab: 'wifi', network: 'ap0', client: station('ap0', 9).mac });
 	assert.equal(widget.collapsed, false);
 	assert.equal(widget.activeGroup, 'net:lan');
-	assert.equal(widget.pages.get('net:lan'), 2);
+	assert.equal(widget.pages.get('net:lan'), 1);
 	widget.toggleGroup('net:guest');
 	assert.equal(widget.activeGroup, 'net:lan');
 	assert.equal(widget.collapsed, false);
@@ -238,7 +239,7 @@ test('upstreams use Internet and unplaced records do not link to unrelated detai
 	}));
 	assert.equal(model.upstreams[0].tab, 'internet');
 	assert.equal(model.upstreams[0].network, 'wan');
-	assert.equal(model.unplaced[0].tab, undefined);
+	assert.equal(model.unplaced[0].tab, 'connections');
 });
 
 test('Internet details include every WAN while the KPI retains the lowest metric route', () => {
@@ -279,7 +280,7 @@ test('Settings displays the same enabled detail tabs as topology navigation', as
 		E: (tag, attrs, children) => ({ tag, attrs, children })
 	});
 	await layout.render(includes);
-	assert.deepEqual(options.tabs.cfgvalue(), ['resources', 'internet', 'system', 'wifi']);
+	assert.deepEqual(options.tabs.cfgvalue(), ['resources', 'internet', 'system', 'wifi', 'connections']);
 	assert.deepEqual(options.charts.cfgvalue(), ['network_path_preview']);
 });
 
@@ -300,4 +301,216 @@ test('the original DHCP tab remains available when lease data exists without ser
 		});
 		assert.equal(await dhcp.available(), available);
 	}
+});
+
+const wiredSnapshot = (overrides = {}) => snapshot([], [], {
+	wifi: null, wifiSupported: false,
+	connections: {
+		interfaces: [{ ...lan, members: ['eth0', 'eth2', 'eth3'] }],
+		devices: ['eth0', 'eth2', 'eth3'].map(id => ({ id, type: 'ethernet', carrier: true, speed: 1000 })),
+		hosts: [station('', 1), station('', 2), station('', 3)],
+		observations: { bridges: [{ device: 'br-lan', available: true, entries: [
+			{ mac: station('', 1).mac, port: 'eth0' }, { mac: station('', 2).mac, port: 'eth2' }, { mac: station('', 3).mac, port: 'eth3' }
+		] }], neighbours: [] },
+		...overrides
+	}
+});
+
+test('a wired appliance exposes every member interface and learned endpoint without Wi-Fi', () => {
+	const model = topology.buildModel(wiredSnapshot());
+	const group = model.groups[0];
+	assert.equal(model.router.icon, 'gateway');
+	assert.equal(model.wifiSupported, false);
+	assert.deepEqual(group.access.map(item => item.name), ['eth0', 'eth2', 'eth3']);
+	assert.deepEqual(group.access.map(item => item.members.length), [1, 1, 1]);
+	assert.equal(group.members.length, 3);
+	assert.equal(model.unplaced.length, 0);
+	assert.equal(group.members[0].context, 'Discovered via eth0');
+	assert.equal(group.members[0].tab, 'connections', 'a learned address opens the Network inventory, not an unrelated lease or Wireless row');
+	assert.match(group.access[0].detail, /1 Gbit\/s/);
+	assert(!JSON.stringify(group).includes('online'), 'learning an address is not a reachability probe');
+});
+
+test('missing attachment RPC keeps ports visible and known devices accessible with unknown placement', () => {
+	const model = topology.buildModel(wiredSnapshot({ observations: null }));
+	assert.equal(model.groups[0].access.length, 3);
+	assert.equal(model.groups[0].members.length, 0);
+	assert.equal(model.unplaced.length, 3);
+	assert(model.unplaced.every(host => host.relation === 'unknown' && host.tab === 'connections'));
+	assert.equal(model.attachmentsAvailable, false);
+});
+
+test('IPv6-only and static hosts can be located by MAC without DHCP or an IPv4 neighbour', () => {
+	const model = topology.buildModel(wiredSnapshot({ hosts: [{ ...station('', 1), addresses: ['fd00::abcd', 'fe80::abcd'] }] }));
+	const endpoint = model.groups[0].members.find(host => host.mac === station('', 1).mac.toUpperCase());
+	assert.equal(endpoint.detail, 'fd00::abcd');
+	assert.deepEqual(endpoint.addresses, ['fd00::abcd', 'fe80::abcd']);
+	assert.equal(endpoint.context, 'Discovered via eth0');
+});
+
+test('a bridge behind one port may contain multiple discovered devices without inventing a direct cable', () => {
+	const data = wiredSnapshot();
+	data.connections.observations.bridges[0].entries.forEach(entry => { entry.port = 'eth0'; });
+	const model = topology.buildModel(data);
+	assert.equal(model.groups[0].access[0].members.length, 3);
+	assert(model.groups[0].members.every(host => host.context === 'Discovered via eth0'));
+});
+
+test('ambiguous FDB ports preserve the network while leaving the interface unidentified', () => {
+	const data = wiredSnapshot();
+	data.connections.observations.bridges[0].entries.push({ mac: station('', 1).mac, port: 'eth2' });
+	const group = topology.buildModel(data).groups[0];
+	const endpoint = group.members.find(host => host.mac === station('', 1).mac.toUpperCase());
+	assert.equal(endpoint.access, 'unlocated');
+	assert.equal(endpoint.relation, 'logical');
+	assert.equal(endpoint.context, 'Multiple interfaces reported');
+});
+
+test('a shared bridge does not assign hosts to an arbitrary logical interface', () => {
+	const data = wiredSnapshot();
+	data.connections.interfaces.push({ ...data.connections.interfaces[0], id: 'alias' });
+	const model = topology.buildModel(data);
+	assert(model.groups.every(group => group.members.length === 0));
+	assert.equal(model.unplaced.length, 3);
+});
+
+test('VLAN-unaware FDB data is rejected; an explicit neighbour can identify only its logical network', () => {
+	const data = wiredSnapshot();
+	data.connections.observations.bridges[0].available = false;
+	data.connections.observations.neighbours = [{ mac: station('', 1).mac, address: '192.0.2.1', device: 'br-lan.20' }];
+	data.connections.interfaces.push({ id: 'guest', device: 'br-lan.20', type: 'vlan', protocol: 'static', up: true });
+	const model = topology.buildModel(data);
+	assert.equal(model.groups.find(group => group.network === 'lan').members.length, 0);
+	const member = model.groups.find(group => group.network === 'guest').members[0];
+	assert.equal(member.access, 'unlocated');
+	assert.equal(member.relation, 'logical');
+	assert.equal(model.unplaced.length, 2);
+});
+
+test('endpoint identity stays scoped when the same MAC is reported in separate bridge domains', () => {
+	const data = wiredSnapshot();
+	data.connections.interfaces.push({ id: 'guest', device: 'br-guest', type: 'bridge', members: ['eth4'], up: true });
+	data.connections.observations.bridges.push({ device: 'br-guest', available: true, entries: [{ mac: station('', 1).mac, port: 'eth4' }] });
+	const model = topology.buildModel(data);
+	const records = model.groups.flatMap(group => group.members).filter(member => member.mac === station('', 1).mac.toUpperCase());
+	assert.equal(records.length, 2);
+	assert.notEqual(records[0].id, records[1].id);
+});
+
+test('local Wi-Fi association evidence wins over a learned bridge address for that network', () => {
+	const data = wiredSnapshot();
+	data.wifiSupported = true;
+	data.wifi = { networks: [radio('ap0')], clients: [station('ap0', 1)] };
+	const group = topology.buildModel(data).groups[0];
+	assert.equal(group.members.filter(host => host.mac === station('', 1).mac.toUpperCase()).length, 1);
+	assert.equal(group.members.find(host => host.mac === station('', 1).mac.toUpperCase()).access, 'wifi:ap0');
+	assert.equal(group.access.find(item => item.id === 'wifi:ap0').members.length, 1);
+});
+
+test('pure upstream interfaces are not duplicated as empty downstream networks', () => {
+	const data = wiredSnapshot();
+	data.router.upstreams = [{ family: 4, network: 'wan', device: 'pppoe-wan', up: true }];
+	data.connections.interfaces.push({ id: 'wan', device: 'pppoe-wan', type: 'tunnel', up: true });
+	const model = topology.buildModel(data);
+	assert.equal(model.upstreams.length, 1);
+	assert(!model.groups.some(group => group.network === 'wan'));
+});
+
+test('unassigned interfaces remain visible, while WAN carrier interfaces are not duplicated as unassigned', () => {
+	const data = wiredSnapshot();
+	data.connections.devices.push({ id: 'eth4', type: 'ethernet', carrier: false });
+	data.connections.devices.push({ id: 'eth1', type: 'ethernet', carrier: true });
+	data.connections.interfaces.push({ id: 'wan', device: 'pppoe-wan', physicalDevice: 'eth1', type: 'tunnel', up: true });
+	const group = topology.buildModel(data).groups.find(item => item.id === 'interfaces:unassigned');
+	assert.deepEqual(group.access.map(item => item.name), ['eth4']);
+	assert.equal(group.access[0].active, false);
+});
+
+test('an explicit upstream gateway stays in the upstream context rather than a duplicate downstream WAN', () => {
+	const data = wiredSnapshot();
+	data.router.upstreams = [{ family: 4, network: 'uplink', device: 'eth1', up: true, gateway: '198.51.100.1' }];
+	data.connections.interfaces.push({ id: 'uplink', device: 'eth1', type: 'ethernet', protocol: 'dhcp', up: true });
+	data.connections.observations.neighbours.push({ mac: '02:00:00:00:01:01', address: '198.51.100.1', device: 'eth1' });
+	const model = topology.buildModel(data);
+	assert(!model.groups.some(group => group.network === 'uplink'));
+	assert(!model.unplaced.some(host => host.mac === '02:00:00:00:01:01'));
+	assert.deepEqual(model.upstreams[0].gatewayAddresses, ['198.51.100.1']);
+});
+
+test('a missing carrier observation stays unknown even when the legacy accessor returns false', () => {
+	const collector = module('lib/topology.js');
+	const data = collector.collectConnections([[], null, [{ getName: () => 'eth9', getMAC: () => null, getCarrier: () => false }], null]);
+	assert.equal(data.devices[0].carrier, null);
+});
+
+test('a static one-arm LAN remains visible even when its interface also supplies the default route', () => {
+	const model = topology.buildModel(snapshot([], [], { wifi: null, wifiSupported: false,
+		router: { upstreams: [{ family: 4, network: 'lan', device: 'eth0', up: true, gateway: '192.0.2.1' }] },
+		connections: { interfaces: [{ id: 'lan', device: 'eth0', type: 'ethernet', protocol: 'static', up: true }], hosts: [] }
+	}));
+	assert.equal(model.upstreams.length, 1);
+	assert.equal(model.groups[0].network, 'lan');
+});
+
+test('IPv6 configuration on the reported PPPoE device is folded into that same upstream', () => {
+	const model = topology.buildModel(snapshot([], [], {
+		router: { upstreams: [{ family: 4, network: 'wan', device: 'pppoe-wan', up: true }] },
+		connections: { interfaces: [lan, { id: 'wan_6', device: 'pppoe-wan', type: 'tunnel', protocol: 'dhcpv6', up: false }], hosts: [] }
+	}));
+	assert.deepEqual(model.upstreams[0].families, [4, 6]);
+	assert.deepEqual(model.upstreams[0].names, ['wan', 'wan_6']);
+	assert.match(model.upstreams[0].detail, /Mixed link state/);
+	assert(!model.groups.some(group => group.network === 'wan_6'));
+});
+
+test('the collector local-address inventory excludes the router itself from every host source', () => {
+	const data = wiredSnapshot();
+	data.connections.observations.localMACs = [station('', 1).mac];
+	data.connections.observations.neighbours.push({ mac: station('', 1).mac, address: '192.0.2.1', device: 'br-lan' });
+	const model = topology.buildModel(data);
+	assert(!model.groups.flatMap(group => group.members).concat(model.unplaced).some(host => host.mac === station('', 1).mac.toUpperCase()));
+});
+
+test('Network details retain unplaced records and complete IPv6 addresses without assigning a fabricated network', () => {
+	const details = module('lib/connections.js', { E: (tag, attrs, children) => ({ tag, attrs, children }) });
+	details.render = () => { details.sections ||= { networks: {}, interfaces: {}, devices: {} }; };
+	details.draw = () => {};
+	const data = wiredSnapshot({ observations: null });
+	data.connections.hosts[0].addresses = ['192.0.2.2', 'fd00::2'];
+	details.update(topology.buildModel(data));
+	assert.equal(details.sections.devices.records.length, 3);
+	assert.equal(details.sections.devices.records[0].values[1], '192.0.2.2, fd00::2');
+	assert.equal(details.sections.devices.records[0].values[3], 'Not identified');
+	assert.equal(details.sections.interfaces.records.length, 3);
+	assert.equal(details.sections.networks.records.length, 1);
+});
+
+test('Network details paginate and navigate to a device beyond the current page, scoped by network', () => {
+	const details = module('lib/connections.js', {
+		E: (tag, attrs) => ({ tag, attrs }),
+		charts: { table: options => ({ parentNode: details.sections.devices.body,
+			querySelectorAll: () => options.rowKeys.map(key => ({ dataset: { rowKey: key } })) }) }
+	});
+	details.render = () => {};
+	details.search = { value: '' };
+	const section = { page: 0, head: [], body: {}, pager: {}, previous: {}, next: {}, range: {},
+		records: Array.from({ length: 73 }, (_, i) => ({ key: 'host-' + i, client: '02:00:00:00:00:01', network: 'lan' + i, search: 'host-' + i, values: ['host-' + i] })) };
+	details.sections = { devices: section };
+	details.drawSection(section);
+	assert.equal(section.table.querySelectorAll().length, 25);
+	assert.equal(section.range.textContent, '1–25 of 73');
+	assert.equal(section.previous.disabled, true);
+	assert.equal(section.next.disabled, false);
+	details.search.value = 'unrelated search';
+	const target = details.navigate({ client: '02:00:00:00:00:01', network: 'lan70' });
+	assert.equal(details.search.value, '');
+	assert.equal(section.page, 2);
+	assert.equal(target.dataset.rowKey, 'host-70');
+	assert.equal(section.range.textContent, '51–73 of 73');
+	assert.equal(section.next.disabled, true);
+	details.search.value = 'host-70';
+	details.draw();
+	assert.equal(section.page, 0);
+	assert.equal(section.table.querySelectorAll().length, 1);
+	assert.equal(section.pager.hidden, true);
 });
