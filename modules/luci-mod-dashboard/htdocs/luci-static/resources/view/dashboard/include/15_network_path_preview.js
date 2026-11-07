@@ -154,13 +154,12 @@ return baseclass.extend({
 			const name = E('span', { 'class': 'dashboard-topology-name' });
 			const detail = E('span', { 'class': 'dashboard-topology-detail' });
 			const toggle = E('span', { 'class': 'dashboard-topology-toggle', 'aria-hidden': 'true' });
-			const label = E('span', { 'class': 'dashboard-topology-label' }, [ name, toggle ]);
-			const button = E(interactive ? 'button' : 'div', { type: interactive ? 'button' : null, 'class': 'dashboard-topology-node' }, [ icon, label, detail ]);
-			node = { button, icon, label, name, detail, toggle };
+			const button = E(interactive ? 'button' : 'div', { type: interactive ? 'button' : null, 'class': 'dashboard-topology-node' }, [ icon, name, detail, toggle ]);
+			node = { button, icon, name, detail, toggle };
 			this.nodes.set(key, node);
 		}
 		if ((node.button.tagName === 'BUTTON') !== interactive) {
-			const replacement = E(interactive ? 'button' : 'div', { type: interactive ? 'button' : null, 'class': 'dashboard-topology-node' }, [ node.icon, node.label, node.detail ]);
+			const replacement = E(interactive ? 'button' : 'div', { type: interactive ? 'button' : null, 'class': 'dashboard-topology-node' }, [ node.icon, node.name, node.detail, node.toggle ]);
 			node.button.replaceWith(replacement);
 			node.button = replacement;
 		}

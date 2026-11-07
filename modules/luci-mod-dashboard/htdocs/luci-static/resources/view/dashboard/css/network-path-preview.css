@@ -61,7 +61,6 @@
 .dashboard-topology-icon[data-icon="computer"] { --dashboard-icon: url('../icons/laptop.svg'); }
 .dashboard-topology-icon[data-icon="watch"] { --dashboard-icon: url('../icons/watch.svg'); }
 .dashboard-topology-icon[data-icon="device"] { --dashboard-icon: url('../icons/monitor-smartphone.svg'); }
-.dashboard-topology-label { display: inline-flex; align-items: center; justify-content: center; align-self: start; gap: 8px; max-width: 100%; min-width: 0; padding-top: 2px; }
 .dashboard-topology-name {
 	display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
 	max-width: 100%; max-height: 32px; overflow: hidden; overflow-wrap: anywhere;
@@ -76,12 +75,17 @@
 .Dashboard .dashboard-topology-node:focus-visible .dashboard-topology-icon { outline: 2px solid var(--dashboard-primary); outline-offset: 3px; }
 .Dashboard div.dashboard-topology-node { cursor: default; }
 .Dashboard button.dashboard-topology-node:active .dashboard-topology-icon { transform: scale(.97); }
-/* Keep the disclosure with its label, clear of the connection lines. */
-.dashboard-topology-toggle { flex: 0 0 6px; width: 6px; height: 6px; margin-right: 2px; border: solid var(--dashboard-text-muted); border-width: 0 1.5px 1.5px 0; transform: rotate(-45deg); transition: transform .15s ease; }
-.dashboard-topology-node[aria-expanded="true"] .dashboard-topology-toggle { border-color: var(--dashboard-primary); transform: translateY(-2px) rotate(45deg); }
+/* The branch starts with a fixed disclosure, even while its children are hidden. */
+.dashboard-topology-node[aria-expanded]::after { content: ''; position: absolute; left: calc(50% + 24px); top: 30px; width: 28px; border-top: 1px solid var(--dashboard-border); pointer-events: none; }
+.dashboard-topology-toggle { position: absolute; z-index: 2; left: calc(50% + 40px); top: 19px; box-sizing: border-box; width: 22px; height: 22px; border: 1px solid var(--dashboard-border); border-radius: 50%; background: var(--dashboard-surface-alt); color: var(--dashboard-text-muted); }
+.dashboard-topology-toggle::before,
+.dashboard-topology-toggle::after { content: ''; position: absolute; left: 50%; top: 50%; background: currentColor; transform: translate(-50%, -50%); }
+.dashboard-topology-toggle::before { width: 8px; height: 1.5px; }
+.dashboard-topology-toggle::after { width: 1.5px; height: 8px; transition: transform .15s ease; }
+.dashboard-topology-node[aria-expanded="true"] .dashboard-topology-toggle::after { transform: translate(-50%, -50%) scaleY(0); }
 .dashboard-topology-node:hover .dashboard-topology-toggle,
-.dashboard-topology-node:focus-visible .dashboard-topology-toggle { border-color: var(--dashboard-primary); }
-@media (prefers-reduced-motion: reduce) { .dashboard-topology-toggle { transition: none; } }
+.dashboard-topology-node:focus-visible .dashboard-topology-toggle { color: var(--dashboard-primary); border-color: var(--dashboard-primary); }
+@media (prefers-reduced-motion: reduce) { .dashboard-topology-toggle::after { transition: none; } }
 .Dashboard .dashboard-topology-node:disabled { cursor: default; opacity: .65; }
 .Dashboard .dashboard-topology-node[data-active="false"] .dashboard-topology-icon { color: var(--dashboard-text-muted); }
 .dashboard-topology-empty { display: grid; align-content: center; min-height: 112px; margin: 0; color: var(--dashboard-text-muted); text-align: center; font-size: 12px; overflow-wrap: anywhere; }
@@ -119,11 +123,12 @@
 	.dashboard-topology-router { width: min(100%, 220px); margin: 0 auto; }
 	.dashboard-topology-groups { grid-template-columns: minmax(0, 1fr); gap: 12px; }
 	.dashboard-topology-groups .dashboard-topology-endpoints { margin: 8px 0 8px 24px; }
-	.Dashboard .dashboard-topology-groups > li > .dashboard-topology-node { grid-template-columns: 48px minmax(0, 1fr); grid-template-rows: 18px 16px; align-content: center; align-items: center; justify-items: start; height: 64px; padding-right: 8px; border-radius: 8px; column-gap: 10px; text-align: left; }
+	.Dashboard .dashboard-topology-groups > li > .dashboard-topology-node { grid-template-columns: 48px minmax(0, 1fr); grid-template-rows: 18px 16px; align-content: center; align-items: center; justify-items: start; height: 64px; padding-right: 42px; border-radius: 8px; column-gap: 10px; text-align: left; }
 	.dashboard-topology-groups > li > .dashboard-topology-node .dashboard-topology-icon { grid-row: 1 / 3; }
-	.dashboard-topology-groups > li > .dashboard-topology-node .dashboard-topology-label { grid-column: 2; grid-row: 1; justify-content: flex-start; align-self: center; padding-top: 0; }
-	.dashboard-topology-groups > li > .dashboard-topology-node .dashboard-topology-name { display: block; white-space: nowrap; text-overflow: ellipsis; }
+	.dashboard-topology-groups > li > .dashboard-topology-node .dashboard-topology-name { grid-column: 2; grid-row: 1; display: block; white-space: nowrap; text-overflow: ellipsis; }
 	.dashboard-topology-groups > li > .dashboard-topology-node .dashboard-topology-detail { grid-column: 2; grid-row: 2; }
+	.dashboard-topology-groups .dashboard-topology-node[aria-expanded]::after { content: none; }
+	.dashboard-topology-groups .dashboard-topology-toggle { left: auto; right: 8px; top: 21px; }
 	.Dashboard .dashboard-topology-groups > li > button.dashboard-topology-node:hover { background: var(--dashboard-surface-alt); }
 	.dashboard-topology-upstreams::before,
 	.dashboard-topology-upstreams > .dashboard-topology-node::after,
