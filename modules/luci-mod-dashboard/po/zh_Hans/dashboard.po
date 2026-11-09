@@ -764,3 +764,27 @@ msgstr "无线对端"
 #: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/lib/topology.js
 msgid "Wireless uplink"
 msgstr "无线中继上联"
+
+#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/lib/topology.js
+msgid "%d devices"
+msgstr "%d 台设备"
+
+#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/lib/connections.js
+msgid "Devices on %s"
+msgstr "%s 的设备"
+
+#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/lib/connections.js
+msgid "Internal switch connection"
+msgstr "交换机内部通道"
+
+#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/lib/connections.js
+msgid "Show all records"
+msgstr "显示全部记录"
+
+#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/lib/connections.js
+msgid "Switch CPU port"
+msgstr "交换机 CPU 端口"
+
+#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/include/15_network_path_preview.js
+msgid "View all %d devices"
+msgstr "查看全部 %d 台设备"

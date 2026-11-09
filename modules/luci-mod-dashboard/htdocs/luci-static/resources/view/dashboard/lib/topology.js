@@ -106,6 +106,7 @@ return baseclass.extend({
 		const localMACs = new Set(devices.map(dev => dev.getMAC()?.toUpperCase()).filter(Boolean));
 		const deviceData = dev => ({
 			id: dev.getName?.(), type: dev.getType?.(),
+			devtype: dev.dev?.devtype, parent: dev.getParent?.()?.getName() || dev.dev?.parent,
 			mac: dev.getMAC?.()?.toUpperCase(),
 			// getCarrier() turns a missing link record into false. Keep it unknown.
 			carrier: typeof(dev.dev?.link?.carrier) === 'boolean' ? dev.dev.link.carrier : null,
@@ -309,12 +310,15 @@ return baseclass.extend({
 			}
 		}
 		const assigned = new Set(interfaces.flatMap(item => [ item.device, item.physicalDevice, ...(item.members || []) ]));
+		// DSA user ports report their CPU-facing parent. That parent is an
+		// internal conduit, not an unused socket or another client network.
+		const conduits = new Set(Array.from(devices.values()).filter(device => device.devtype === 'dsa' && device.parent).map(device => device.parent));
 		for (const group of groups.values())
 			for (const access of group.access || [])
 				if (access.device)
 					assigned.add(access.device);
 		for (const device of devices.values()) {
-			if (!device.id || device.id === 'lo' || assigned.has(device.id) || ![ 'ethernet', 'switch', 'vlan', 'tunnel', 'wireguard' ].includes(device.type))
+			if (!device.id || device.id === 'lo' || assigned.has(device.id) || conduits.has(device.id) || ![ 'ethernet', 'switch', 'vlan', 'tunnel', 'wireguard' ].includes(device.type))
 				continue;
 			if (!groups.has('interfaces:unassigned'))
 				groups.set('interfaces:unassigned', { id: 'interfaces:unassigned', name: _('Unassigned interfaces'), icon: 'port', kind: 'logical', relation: 'logical', context: _('Not assigned to a configured network'), members: [], wifiNetworks: [], errors: [], radios: 0, access: [] });
@@ -401,7 +405,7 @@ return baseclass.extend({
 
 		for (const group of groups.values()) {
 			for (const access of group.access || [])
-				access.members = group.members.filter(member => member.access === access.id);
+				access.members = group.members.filter(member => member.access === access.id).sort(byId);
 			group.members.sort(byId);
 			const count = group.members.length;
 			const quantity = group.kind === 'peer' ? _('%d reported peers').format(count) : _('%d wireless associations').format(count);
@@ -416,6 +420,8 @@ return baseclass.extend({
 				group.detail = [ group.context, ports.length ? _('%d interfaces').format(ports.length) : null, devices ? _('%d discovered devices').format(devices) : null ].filter(Boolean).join(' · ');
 				group.summary = count ? _('%d discovered devices').format(count) : _('No endpoint attachment reported.');
 			}
+			if (group.kind === 'logical')
+				group.detail = _('%d devices').format(new Set(group.members.map(member => member.mac)).size);
 		}
 
 		const unplaced = new Map();
@@ -431,6 +437,7 @@ return baseclass.extend({
 		}
 
 		return {
+			infrastructure: Array.from(devices.values()).filter(device => conduits.has(device.id) && !assigned.has(device.id)),
 			router: { id: 'router', name: text(router.hostname) || text(router.model) || _('This device'), detail: text(router.managementAddress) || text(router.model), icon: radios.size ? 'router' : 'gateway', tab: 'system' },
 			upstreams: Array.from(upstreams.values()).sort(byId),
 			groups: Array.from(groups.values()).filter(group => !(

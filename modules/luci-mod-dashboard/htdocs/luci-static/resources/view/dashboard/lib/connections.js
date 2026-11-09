@@ -14,7 +14,10 @@ return baseclass.extend({
 				Object.values(this.sections).forEach(section => { section.page = 0; });
 				this.draw();
 			} });
-		this.node = E('div', { 'class': 'dashboard-connections' }, [ this.search,
+		this.scopeLabel = E('span');
+		this.scopeBar = E('div', { 'class': 'dashboard-connections-scope', hidden: true }, [ this.scopeLabel,
+			E('button', { type: 'button', 'class': 'cbi-button', click: () => { this.scope = null; this.draw(); } }, _('Show all records')) ]);
+		this.node = E('div', { 'class': 'dashboard-connections' }, [ this.search, this.scopeBar,
 			this.section('networks', _('Networks'), [ _('Network'), _('Interface'), _('Protocol'), _('Status'), _('Devices'), '' ]),
 			this.section('interfaces', _('Interfaces'), [ _('Interface'), _('Network'), _('Type'), _('Status / details'), _('Devices'), '' ]),
 			this.section('devices', _('Device observations'), [ _('Hostname'), _('IP addresses'), _('MAC address'), _('Network'), _('Attachment'), _('Observation'), '' ]),
@@ -56,7 +59,9 @@ return baseclass.extend({
 		this.sections.interfaces.records = model.groups.flatMap(group => (group.access || []).map(access => record(group.id + '|' + access.id, [
 			access.name, group.name, access.kind === 'wireless' ? _('Wireless') : access.kind === 'virtual' ? _('Virtual interface') : access.kind === 'unknown' ? _('Unknown') : _('Network interface'),
 			access.detail, String(access.members.length), this.locate({ network: group.network, group: group.id, access: access.id })
-		], { network: group.network, access: access.id, group: group.id })));
+		], { network: group.network, access: access.id, group: group.id }))).concat((model.infrastructure || []).map(device => record('internal:' + device.id, [
+			device.id, '-', _('Switch CPU port'), _('Internal switch connection'), '-', ''
+		])));
 		this.sections.devices.records = [
 			...model.groups.flatMap(group => group.members.map(member => ({ ...member, group: group.id, groupName: group.name }))),
 			...model.unplaced
@@ -69,13 +74,24 @@ return baseclass.extend({
 	},
 
 	draw() {
-		for (const section of Object.values(this.sections))
+		if (this.scopeBar)
+			this.scopeBar.hidden = !this.scope;
+		for (const section of Object.values(this.sections)) {
+			if (section.node)
+				section.node.hidden = !!this.scope && section.id !== 'devices';
 			this.drawSection(section);
+		}
+	},
+
+	matchesScope(record) {
+		return !this.scope || ((!this.scope.group || record.group === this.scope.group) &&
+			(!this.scope.access || record.access === this.scope.access) &&
+			(!!this.scope.group || !this.scope.network || record.network === this.scope.network));
 	},
 
 	drawSection(section) {
 		const query = this.search.value.trim().toLowerCase();
-		const records = section.records.filter(record => !query || record.search.includes(query));
+		const records = section.records.filter(record => this.matchesScope(record) && (!query || record.search.includes(query)));
 		section.page = Math.max(0, Math.min(section.page, Math.ceil(records.length / PAGE_SIZE) - 1));
 		const start = section.page * PAGE_SIZE;
 		const shown = records.slice(start, start + PAGE_SIZE);
@@ -94,8 +110,17 @@ return baseclass.extend({
 	navigate(selection) {
 		this.render();
 		this.search.value = '';
+		this.scope = selection.section === 'devices' && !selection.client ? {
+			group: selection.group, access: selection.access, network: selection.network
+		} : null;
+		if (this.scopeLabel && this.scope) {
+			const access = this.sections.interfaces.records.find(record => record.access === selection.access && (!selection.group || record.group === selection.group));
+			this.scopeLabel.textContent = _('Devices on %s').format(access?.values[0] || selection.network || _('Network'));
+		}
 		this.draw();
-		const section = this.sections[selection.client ? 'devices' : selection.access || selection.interface ? 'interfaces' : selection.section || 'networks'] || this.sections.networks;
+		const section = this.sections[selection.client ? 'devices' : selection.section || (selection.access || selection.interface ? 'interfaces' : 'networks')] || this.sections.networks;
+		if (this.scope)
+			return section.node;
 		if (!selection.client && !selection.network && !selection.access && !selection.interface)
 			return section.node;
 		const index = section.records.findIndex(record =>

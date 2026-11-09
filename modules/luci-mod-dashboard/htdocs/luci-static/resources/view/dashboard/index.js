@@ -348,6 +348,7 @@ function startPolling(includes, layout, root, form) {
 			return;
 		const destination = {
 			network: source.dataset.dashboardNetwork || null,
+			group: source.dataset.dashboardTopologyGroup || null,
 			access: source.dataset.dashboardAccess || null,
 			interface: source.dataset.dashboardInterface || null,
 			client: source.dataset.dashboardClient ? source.dataset.dashboardClient.toUpperCase() : null,
