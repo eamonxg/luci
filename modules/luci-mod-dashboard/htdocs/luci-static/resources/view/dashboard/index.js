@@ -318,7 +318,7 @@ function startPolling(includes, layout, root, form) {
 		if (reveal && root.contains(reveal)) {
 			ev.preventDefault();
 			showTopology({
-				tab: reveal.dataset.dashboardTargetTab || 'connections',
+				tab: reveal.dataset.dashboardTargetTab || 'internet',
 				network: reveal.dataset.dashboardNetwork || null, client: reveal.dataset.dashboardClient || null,
 				access: reveal.dataset.dashboardAccess || null, group: reveal.dataset.dashboardTopologyGroup || null
 			});

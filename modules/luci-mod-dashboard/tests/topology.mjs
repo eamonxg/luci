@@ -197,14 +197,14 @@ test('topology supplies existing destinations even when saved tabs omit them', a
 	const widget = module('include/15_network_path_preview.js');
 	const includes = [widget, { widgets: ['internet', 'system', 'dhcp', 'wifi', 'resources'].map(id => ({ id, slot: 'tabs' })) }];
 	const layout = await widgets.layout(includes);
-	assert.deepEqual(layout.tabs, ['resources', 'connections', 'internet', 'system', 'wifi']);
-	assert.deepEqual(widgets.resolveLayout(includes, { ...layout, tabs: ['dhcp'] }).tabs, ['dhcp', 'internet', 'system', 'wifi', 'connections']);
+	assert.deepEqual(layout.tabs, ['resources', 'internet', 'system', 'wifi']);
+	assert.deepEqual(widgets.resolveLayout(includes, { ...layout, tabs: ['dhcp'] }).tabs, ['dhcp', 'internet', 'system', 'wifi']);
 	assert.deepEqual(stored.tabs, ['resources', 'connections', 'resources']);
 	assert.deepEqual(widgets.resolveLayout(includes, widgets.configuredLayout(includes)), layout);
 	assert.deepEqual(widgets.resolveLayout(includes, layout), layout);
 	assert.deepEqual(widgets.resolveLayout(includes, { ...layout, charts: [], tabs: ['resources'] }).tabs, ['resources']);
 	const wiredOnly = [widget, { widgets: ['internet', 'system'].map(id => ({ id, slot: 'tabs' })) }];
-	assert.deepEqual(widgets.resolveLayout(wiredOnly, { cards: [], charts: ['network_path_preview'], tabs: [] }).tabs, ['internet', 'system', 'connections']);
+	assert.deepEqual(widgets.resolveLayout(wiredOnly, { cards: [], charts: ['network_path_preview'], tabs: [] }).tabs, ['internet', 'system']);
 });
 
 test('group clicks toggle children without selecting a detail destination; reveal opens the selected client', () => {
@@ -239,12 +239,14 @@ test('upstreams use Internet and unplaced records do not link to unrelated detai
 	}));
 	assert.equal(model.upstreams[0].tab, 'internet');
 	assert.equal(model.upstreams[0].network, 'wan');
-	assert.equal(model.unplaced[0].tab, 'connections');
+	assert.equal(model.unplaced[0].tab, 'internet');
 });
 
 test('Internet details include every WAN while the KPI retains the lowest metric route', () => {
 	const router = module('include/10_router.js', {
-		rpc: { declare: () => {} }, E: (tag, attributes, children) => ({ tag, attributes, children })
+		rpc: { declare: () => {} }, E: (tag, attributes, children) => ({ tag, attributes, children }),
+		connections: { render: () => ({ inventory: true }), navigate: selection => ({ section: selection.section }) },
+		L: { dom: { content: (node, children) => { node.children = children; } } }
 	});
 	const net = (name, metric) => ({
 		getName: () => name, getMetric: () => metric, getUptime: () => 0,
@@ -255,10 +257,15 @@ test('Internet details include every WAN while the KPI retains the lowest metric
 	router.params = { internet: router.internetData(router.wanData) };
 	router.renderInternetColumn = (group, name) => ({ name, gateway: group.gatewayv4?.value });
 	const content = router.renderInternetTab();
-	assert.deepEqual(content.children.slice(0, 2), [{ name: 'wan', gateway: 'wan-gateway' }, { name: 'lte', gateway: 'lte-gateway' }]);
+	assert.deepEqual(content.children[0].children.slice(0, 2), [{ name: 'wan', gateway: 'wan-gateway' }, { name: 'lte', gateway: 'lte-gateway' }]);
 	assert.equal(router.params.internet.v4.gatewayv4.value, 'wan-gateway');
 	const destinations = [{ dataset: { dashboardNetwork: 'wan' } }, { dataset: { dashboardNetwork: 'lte' } }];
-	router.internetNode = { querySelectorAll: () => destinations };
+	const detail = router.localDetails;
+	assert.equal(router.renderInternetTab(), content);
+	assert.equal(router.localDetails, detail);
+	assert.deepEqual(router.navigate({ section:'interfaces',access:'device:eth0' }), { section:'interfaces' });
+	assert.equal(detail.open, true);
+	router.wanNode = { querySelectorAll: () => destinations };
 	assert.equal(router.navigate({ network: 'lte' }), destinations[1]);
 });
 
@@ -280,7 +287,7 @@ test('Settings displays the same enabled detail tabs as topology navigation', as
 		E: (tag, attrs, children) => ({ tag, attrs, children })
 	});
 	await layout.render(includes);
-	assert.deepEqual(options.tabs.cfgvalue(), ['resources', 'internet', 'system', 'wifi', 'connections']);
+	assert.deepEqual(options.tabs.cfgvalue(), ['resources', 'internet', 'system', 'wifi']);
 	assert.deepEqual(options.charts.cfgvalue(), ['network_path_preview']);
 });
 
@@ -326,7 +333,7 @@ test('a wired appliance exposes every member interface and learned endpoint with
 	assert.equal(group.members.length, 3);
 	assert.equal(model.unplaced.length, 0);
 	assert.equal(group.members[0].context, 'Discovered via eth0');
-	assert.equal(group.members[0].tab, 'connections', 'a learned address opens the Network inventory, not an unrelated lease or Wireless row');
+	assert.equal(group.members[0].tab, 'internet', 'a learned address opens local device details in the existing Internet tab');
 	assert.match(group.access[0].detail, /1 Gbit\/s/);
 	assert(!JSON.stringify(group).includes('online'), 'learning an address is not a reachability probe');
 });
@@ -336,7 +343,7 @@ test('missing attachment RPC keeps ports visible and known devices accessible wi
 	assert.equal(model.groups[0].access.length, 3);
 	assert.equal(model.groups[0].members.length, 0);
 	assert.equal(model.unplaced.length, 3);
-	assert(model.unplaced.every(host => host.relation === 'unknown' && host.tab === 'connections'));
+	assert(model.unplaced.every(host => host.relation === 'unknown' && host.tab === 'internet'));
 	assert.equal(model.attachmentsAvailable, false);
 });
 
@@ -527,12 +534,12 @@ test('DSA CPU conduits are identified from reported parent relationships, withou
 	assert(model.groups.flatMap(group => group.access).some(access => access.device === 'eth9'));
 });
 
-test('the overview omits unused networks and unassigned interfaces while keeping them available in details', () => {
+test('the overview keeps configured networks and leaves unassigned interfaces in details', () => {
 	const widget = module('include/15_network_path_preview.js');
 	const model = topology.buildModel(snapshot([], [], { connections: { interfaces: [lan,
 		{ id: 'docker', device: 'docker0', type: 'bridge', protocol: 'none', up: false }],
 		devices: [{ id: 'eth9', type: 'ethernet', carrier: true }], hosts: [] } }));
-	assert.deepEqual(widget.overviewGroups(model).map(group => group.id), ['net:lan']);
+	assert.deepEqual(widget.overviewGroups(model).map(group => group.id), ['net:docker','net:lan']);
 	assert(model.groups.some(group => group.id === 'net:docker'));
 	assert(model.groups.some(group => group.id === 'interfaces:unassigned'));
 	assert(widget.overviewGroups(model, 'net:docker').some(group => group.id === 'net:docker'));
@@ -577,4 +584,29 @@ test('View all scopes the full device list to one attachment, preserving all cli
 	assert.equal(details.sections.devices.records.filter(record => details.matchesScope(record)).length, 50);
 	details.scope = null;
 	assert.equal(details.sections.devices.records.filter(record => details.matchesScope(record)).length, 51);
+});
+
+test('topology adds no tab and configured inactive networks remain visible', () => {
+	const widget = module('include/15_network_path_preview.js');
+	assert(!widget.widgets.some(widget => widget.slot === 'tabs'));
+	assert.deepEqual(widget.widgets[0].detailTabs, ['internet','system','wifi']);
+	const model = topology.buildModel(snapshot([], [], { connections: { interfaces: [lan,
+		{ id:'docker',device:'docker0',type:'bridge',protocol:'none',up:false },
+		{ id:'guest',device:'br-guest',type:'bridge',protocol:'static',up:false }], hosts: [] } }));
+	assert.deepEqual(widget.overviewGroups(model).map(group => group.name), ['docker','guest','lan']);
+});
+
+test('existing Internet details keep their data sources when the topology chart is disabled', async () => {
+	const source = readFileSync(new URL('index.js', directory), 'utf8');
+	const load = new Function(source.slice(source.indexOf('function invokeIncludesLoad'), source.indexOf('function collectSections')) + '\nreturn invokeIncludesLoad;')();
+	const router = module('include/10_router.js', { rpc: { declare: () => {} } });
+	const graph = module('include/15_network_path_preview.js');
+	const calls = [];
+	router.load = async () => { calls.push('router'); };
+	graph.load = async () => { calls.push('connections'); };
+	const wifi = { widgets: [{ id:'wifi',slot:'tabs' }], topologySource:'wifi', load:async () => { calls.push('wifi'); } };
+	await load([router,graph,wifi], { cards:[],charts:[],tabs:['internet'] });
+	assert.deepEqual(calls.sort(), ['connections','router','wifi']);
+	assert.equal(graph.topologyEnabled, false);
+	assert.equal(graph.skipped, false);
 });

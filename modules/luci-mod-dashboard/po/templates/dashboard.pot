@@ -757,3 +757,7 @@ msgstr ""
 #: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/include/15_network_path_preview.js
 msgid "View all %d devices"
 msgstr ""
+
+#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/include/10_router.js
+msgid "Local networks and devices"
+msgstr ""

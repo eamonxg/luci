@@ -788,3 +788,7 @@ msgstr "交换机 CPU 端口"
 #: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/include/15_network_path_preview.js
 msgid "View all %d devices"
 msgstr "查看全部 %d 台设备"
+
+#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/include/10_router.js
+msgid "Local networks and devices"
+msgstr "本地网络与设备"
