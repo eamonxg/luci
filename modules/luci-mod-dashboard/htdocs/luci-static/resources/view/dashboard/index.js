@@ -281,10 +281,8 @@ function startPolling(includes, layout, root, form) {
 		const offset = frame.node === window ? window.scrollY : frame.node.scrollTop;
 		frame.node.scrollTo({ top: Math.max(0, offset + top - frame.top - 16), behavior: 'auto' });
 	};
-	const topologyTarget = ({ network, client, access, group }) => Array.from(root.querySelectorAll('[data-dashboard-overview] [data-dashboard-network], [data-dashboard-overview] [data-dashboard-client], [data-dashboard-overview] [data-dashboard-group]'))
-		.find(link => (!access || link.dataset.dashboardAccess === access) &&
-			(!group || access || client || link.dataset.dashboardGroup === group) &&
-			(link.dataset.dashboardNetwork || null) === (network || null) &&
+	const topologyTarget = ({ network, client }) => Array.from(root.querySelectorAll('[data-dashboard-overview] [data-dashboard-network]'))
+		.find(link => (link.dataset.dashboardNetwork || null) === (network || null) &&
 			(link.dataset.dashboardClient || null) === (client || null));
 	const showTopology = location => {
 		const overview = root.querySelector('[data-dashboard-overview]');
@@ -314,16 +312,6 @@ function startPolling(includes, layout, root, form) {
 	// Widgets declare destinations; the shell owns native LuCI tab activation.
 	// Use the tab's own click handler so its state and events stay in sync.
 	root.addEventListener('click', ev => {
-		const reveal = ev.target.closest('[data-dashboard-topology-show]');
-		if (reveal && root.contains(reveal)) {
-			ev.preventDefault();
-			showTopology({
-				tab: reveal.dataset.dashboardTargetTab || 'internet',
-				network: reveal.dataset.dashboardNetwork || null, client: reveal.dataset.dashboardClient || null,
-				access: reveal.dataset.dashboardAccess || null, group: reveal.dataset.dashboardTopologyGroup || null
-			});
-			return;
-		}
 		const locator = ev.target.closest('[data-dashboard-locate]');
 		if (locator && root.contains(locator)) {
 			ev.preventDefault();
@@ -348,9 +336,6 @@ function startPolling(includes, layout, root, form) {
 			return;
 		const destination = {
 			network: source.dataset.dashboardNetwork || null,
-			group: source.dataset.dashboardTopologyGroup || null,
-			access: source.dataset.dashboardAccess || null,
-			interface: source.dataset.dashboardInterface || null,
 			client: source.dataset.dashboardClient ? source.dataset.dashboardClient.toUpperCase() : null,
 			section: source.dataset.dashboardSection || null
 		};

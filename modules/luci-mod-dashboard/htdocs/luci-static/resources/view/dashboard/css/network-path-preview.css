@@ -1,14 +1,7 @@
 /* One expanded branch, with the same nodes in desktop and phone layouts. */
 .Dashboard .dashboard-charts > .dashboard-topology { flex-basis: 100%; min-width: 0; }
 .Dashboard .dashboard-topology [hidden] { display: none !important; }
-.dashboard-connections [hidden] { display: none !important; }
 .Dashboard .dashboard-topology > .cbi-section-descr:empty { display: none; }
-.dashboard-topology-status,
-.dashboard-topology-pager { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; }
-.dashboard-topology-status { justify-content: space-between; margin-top: 12px; }
-.dashboard-topology-pager { font-size: 12px; color: var(--dashboard-text-muted); }
-.dashboard-topology-pager { gap: 8px; }
-.dashboard-topology-pager > button { margin: 0; }
 .dashboard-topology-message { margin: 12px 0 0; color: var(--dashboard-text-muted); font-size: 12px; }
 
 .dashboard-topology-columns,
@@ -116,8 +109,10 @@
 .dashboard-topology-endpoints[data-has-links]::before { left: -12px; top: var(--topology-branch-start, 26px); height: var(--topology-branch-height, 0px); border-left: 1px dashed var(--dashboard-border); }
 .dashboard-topology-access::before { left: -12px; top: var(--topology-access-center, 26px); width: 12px; border-top: 1px dashed var(--dashboard-border); }
 .dashboard-topology-access { border: 0; }
+.dashboard-topology-tree .dashboard-topology-clients { max-height: 440px; overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; margin-left: -12px; padding-left: 12px; }
+.Dashboard button.dashboard-topology-access-link { cursor: pointer; }
 .dashboard-topology-access-header { position: relative; display: flex; align-items: center; gap: 8px; min-height: 32px; }
-.Dashboard .dashboard-topology-access-link { display: grid; grid-template-columns: 24px minmax(0, 1fr); align-items: center; gap: 8px; width: auto; max-width: calc(100% - 32px); min-width: 0; margin: 0; padding: 4px 0; border: 0; background: transparent; box-shadow: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.Dashboard .dashboard-topology-access-link { display: grid; grid-template-columns: 24px minmax(0, 1fr); align-items: center; gap: 8px; width: auto; max-width: calc(100% - 32px); min-width: 0; margin: 0; padding: 4px 0; border: 0; background: transparent; box-shadow: none; color: inherit; font: inherit; text-align: left; cursor: default; }
 .dashboard-topology-access-header .dashboard-topology-icon { --dashboard-icon-size: 24px; --dashboard-icon-glyph-size: 16px; }
 .dashboard-topology-access-label { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .dashboard-topology-access-label > strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
@@ -125,44 +120,20 @@
 .dashboard-topology-access-detail:not(:empty) { padding: 0 5px; border-radius: 8px; background: var(--dashboard-surface-alt); }
 .Dashboard .dashboard-topology-access-toggle { display: grid; place-items: center; width: 24px; height: 24px; margin: 0; padding: 0; border: 0; background: transparent; box-shadow: none; cursor: pointer; }
 .dashboard-topology-access-toggle > .dashboard-topology-toggle { position: relative; left: auto; top: auto; width: 20px; height: 20px; }
-.dashboard-topology-access-link:hover strong { color: var(--dashboard-primary); }
-.dashboard-topology-access-link:focus-visible,
+button.dashboard-topology-access-link:hover strong { color: var(--dashboard-primary); }
+button.dashboard-topology-access-link:focus-visible,
 .dashboard-topology-access-toggle:focus-visible { outline: 2px solid var(--dashboard-primary); outline-offset: 2px; }
 .dashboard-topology-access-header[data-active="false"] .dashboard-topology-icon { color: var(--dashboard-text-muted); }
-.dashboard-topology-access-devices { position: relative; padding: 0 0 4px !important; }
+.dashboard-topology-access-devices { position: relative; max-height: 156px; overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; padding: 0 0 4px !important; }
 .dashboard-topology-access-devices > li::before { content: ''; position: absolute; left: 12px; top: 0; bottom: 0; border-left: 1px solid var(--dashboard-border); }
 .dashboard-topology-access-devices > li:last-child::before { bottom: 50%; }
 .dashboard-topology-access-devices > li::after { content: ''; position: absolute; left: 12px; top: 50%; width: 14px; border-top: 1px solid var(--dashboard-border); }
 .dashboard-topology-access-devices > li[data-relation="logical"]::before { border-left-style: dashed; }
 .dashboard-topology-access-devices > li[data-relation="logical"]::after { border-top-style: dashed; }
-.Dashboard .dashboard-topology-access-devices .dashboard-topology-node,
-.Dashboard .dashboard-topology-unplaced-list .dashboard-topology-node { grid-template-columns: 28px minmax(0, 1fr); grid-template-rows: minmax(18px, auto) minmax(16px, auto); align-content: center; align-items: center; justify-items: start; column-gap: 8px; height: auto; min-height: 44px; padding: 4px 4px 4px 26px; text-align: left; }
-.dashboard-topology-access-devices .dashboard-topology-icon,
-.dashboard-topology-unplaced-list .dashboard-topology-icon { --dashboard-icon-size: 28px; --dashboard-icon-glyph-size: 18px; grid-row: 1 / 3; }
-.dashboard-topology-access-devices .dashboard-topology-name,
-.dashboard-topology-unplaced-list .dashboard-topology-name { grid-column: 2; grid-row: 1; }
-.dashboard-topology-access-devices .dashboard-topology-detail,
-.dashboard-topology-unplaced-list .dashboard-topology-detail { grid-column: 2; grid-row: 2; }
-.dashboard-topology-unplaced,
-.dashboard-topology-help { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--dashboard-border); color: var(--dashboard-text-muted); font-size: 12px; }
-.dashboard-topology-unplaced > summary,
-.dashboard-topology-help > summary { width: fit-content; cursor: pointer; }
-.dashboard-topology-unplaced > p,
-.dashboard-topology-help > p { margin: 10px 0; line-height: 1.6; }
-.dashboard-topology-unplaced-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; list-style: none; margin: 12px 0; padding: 0; }
-.dashboard-topology-unplaced-list > li { min-width: 0; list-style: none; }
-.Dashboard .dashboard-topology-unplaced-list .dashboard-topology-node { padding-left: 8px; }
-.dashboard-connections > input { width: min(100%, 420px); }
-.dashboard-connections > section { margin-top: 24px; }
-.dashboard-connections-table { overflow-x: auto; }
-.dashboard-connections .dashboard-topology-pager { margin-top: 12px; }
-.dashboard-connections-scope { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 12px; }
-.Dashboard .dashboard-topology-more { margin: 4px 0 4px 26px; padding: 4px 8px; border: 0; background: transparent; box-shadow: none; color: var(--dashboard-primary); font: inherit; font-size: 12px; cursor: pointer; }
-.dashboard-topology-more:hover { text-decoration: underline; }
-.dashboard-topology-more:focus-visible { outline: 2px solid var(--dashboard-primary); outline-offset: 2px; }
-.Dashboard .dashboard-topology-endpoints > button[data-dashboard-section="interfaces"] { display: block; margin: 8px 0 0; padding: 4px 0; border: 0; background: transparent; box-shadow: none; color: var(--dashboard-text-muted); font-size: 12px; }
-.Dashboard .dashboard-topology-endpoints > button[data-dashboard-section="interfaces"]:hover { color: var(--dashboard-primary); text-decoration: underline; }
-.dashboard-topology > button[data-dashboard-section="networks"] { display: block; margin: 0 0 12px auto; }
+.Dashboard .dashboard-topology-access-devices .dashboard-topology-node { grid-template-columns: 28px minmax(0, 1fr); grid-template-rows: minmax(18px, auto) minmax(16px, auto); align-content: center; align-items: center; justify-items: start; column-gap: 8px; height: auto; min-height: 44px; padding: 4px 4px 4px 26px; text-align: left; }
+.dashboard-topology-access-devices .dashboard-topology-icon { --dashboard-icon-size: 28px; --dashboard-icon-glyph-size: 18px; grid-row: 1 / 3; }
+.dashboard-topology-access-devices .dashboard-topology-name { grid-column: 2; grid-row: 1; }
+.dashboard-topology-access-devices .dashboard-topology-detail { grid-column: 2; grid-row: 2; }
 
 @media (max-width: 900px) {
 	.Dashboard .dashboard-topology > .cbi-section-descr { min-height: 0; margin-bottom: 12px; }
@@ -208,6 +179,5 @@
 	.dashboard-topology-endpoints[data-has-links]::before,
 	.dashboard-topology-access::before { content: none; }
 	.dashboard-topology-access-toggle > .dashboard-topology-toggle { position: relative; left: auto; right: auto; top: auto; }
-	.dashboard-topology-unplaced-list { grid-template-columns: minmax(0, 1fr); }
 	.dashboard-topology-empty { min-height: 44px; }
 }

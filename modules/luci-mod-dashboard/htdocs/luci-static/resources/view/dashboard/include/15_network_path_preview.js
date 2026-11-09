@@ -2,11 +2,8 @@
 'require baseclass';
 'require view.dashboard.lib.charts as charts';
 'require view.dashboard.lib.topology as topology';
-'require view.dashboard.lib.connections as connections';
 
-const PAGE_SIZE = 8;
-const CLIENT_PREVIEW = 3;
-const ACCESS_LIMIT = 4;
+const COLLAPSE_THRESHOLD = 3;
 
 function text(node, value) {
 	value = String(value ?? '');
@@ -60,16 +57,15 @@ return baseclass.extend({
 		this.nodes = new Map();
 		this.accessNodes = new Map();
 		this.accessStates = new Map();
-		this.unplacedPage = 0;
 		this.selection = {};
 		this.upstreams = E('div', { 'class': 'dashboard-topology-upstreams' });
 		this.router = E('div', { 'class': 'dashboard-topology-router' });
 		this.groups = E('ul', { 'class': 'dashboard-topology-groups' });
 		this.clients = E('ul', { 'class': 'dashboard-topology-clients' });
 		this.empty = E('p', { 'class': 'dashboard-topology-empty' });
-		this.allInterfaces = E('button', { type: 'button', 'class': 'cbi-button', 'data-dashboard-tab': 'internet', 'data-dashboard-section': 'interfaces', hidden: true });
-		this.endpoints = E('div', { 'class': 'dashboard-topology-endpoints', id: 'dashboard-topology-endpoints' }, [ this.clients, this.empty, this.allInterfaces ]);
+		this.endpoints = E('div', { 'class': 'dashboard-topology-endpoints', id: 'dashboard-topology-endpoints' }, [ this.clients, this.empty ]);
 		this.tree = E('div', { 'class': 'dashboard-topology-tree' }, [ this.upstreams, this.router, this.groups, this.endpoints ]);
+		this.clients.addEventListener('scroll', () => this.updateConnectors());
 		this.mobile = window.matchMedia('(max-width: 900px)');
 		this.mobile.addEventListener('change', () => {
 			const focused = document.activeElement;
@@ -79,17 +75,7 @@ return baseclass.extend({
 		});
 		this.upstreamEmpty = E('p', { 'class': 'dashboard-topology-empty' }, _('No upstream routes reported.'));
 		this.notice = E('p', { 'class': 'dashboard-topology-message' });
-		this.unplacedList = E('ul', { 'class': 'dashboard-topology-unplaced-list' });
-		this.unplacedTitle = E('summary');
-		this.unplacedRange = E('span', { role: 'status' });
-		this.unplacedPrevious = E('button', { type: 'button', 'class': 'cbi-button', click: () => { this.unplacedPage--; this.updateTree(); } }, _('Previous'));
-		this.unplacedNext = E('button', { type: 'button', 'class': 'cbi-button', click: () => { this.unplacedPage++; this.updateTree(); } }, _('Next'));
-		this.unplacedPager = E('div', { 'class': 'dashboard-topology-pager' }, [ this.unplacedRange, this.unplacedPrevious, this.unplacedNext ]);
-		this.unplaced = E('details', { 'class': 'dashboard-topology-unplaced' }, [
-			this.unplacedTitle,
-			this.unplacedList, this.unplacedPager
-		]);
-		this.allNetworks = E('button', { type: 'button', 'class': 'cbi-button', 'data-dashboard-tab': 'internet', 'data-dashboard-section': 'networks', hidden: true });
+
 		this.node = charts.card({
 			title: _('Network topology'), className: 'dashboard-topology',
 			body: [
@@ -97,11 +83,7 @@ return baseclass.extend({
 					E('span', {}, _('Upstream routes')), E('span', {}, _('This device')),
 					E('span', {}, _('Networks')), E('span', {}, _('Interfaces and devices'))
 				]),
-				this.allNetworks,
 				this.tree,
-				this.unplaced,
-				E('details', { 'class': 'dashboard-topology-help' }, [ E('summary', {}, _('About this topology')),
-					E('p', {}, _('This view combines network membership, wireless associations and interface discovery. Discovery via an interface does not prove a direct cable connection. Address records do not prove Internet access.')) ]),
 				this.notice
 			]
 		});
@@ -155,14 +137,18 @@ return baseclass.extend({
 			if (selection.access)
 				this.accessStates.set(group.id + '|' + selection.access, true);
 		}
-		else if (selection.client) {
-			const index = this.model?.unplaced.findIndex(member => member.mac === selection.client) ?? -1;
-			if (index >= 0) {
-				this.unplacedPage = Math.floor(index / PAGE_SIZE);
-				this.unplaced.open = true;
+		this.updateTree();
+		// Reveal a selected Wi-Fi client inside its bounded branch list.
+		if (group && selection.client) {
+			const member = group.members.find(member => member.mac === selection.client && member.network === selection.network);
+			const button = member && this.nodes?.get('member:' + member.id)?.button;
+			const list = button?.closest('.dashboard-topology-access-devices');
+			if (list) {
+				const box = button.getBoundingClientRect(), viewport = list.getBoundingClientRect();
+				if (box.top < viewport.top || box.bottom > viewport.bottom)
+					list.scrollTop += box.top - viewport.top - (viewport.height - box.height) / 2;
 			}
 		}
-		this.updateTree();
 	},
 
 	getNode(key, data, live, selected = false, expandable = false) {
@@ -192,10 +178,10 @@ return baseclass.extend({
 		attr(node.button, 'data-dashboard-network', data.network);
 		attr(node.button, 'data-dashboard-client', data.mac);
 		attr(node.button, 'data-dashboard-access', data.access);
-		attr(node.button, 'data-dashboard-section', !expandable ? (data.tab === 'wifi' ? (data.mac ? 'clients' : 'networks') : data.mac ? 'devices' : data.kind ? 'networks' : null) : null);
+		attr(node.button, 'data-dashboard-section', !expandable ? (data.tab === 'wifi' ? (data.mac ? 'clients' : 'networks') : null) : null);
 		attr(node.button, 'data-active', data.active === false || data.relation === 'unknown' ? 'false' : null);
 		attr(node.button, 'aria-current', selected ? 'true' : null);
-		const description = [ data.detail, data.mac ? data.context : null, data.gatewayAddresses?.join(' / ') ].filter(Boolean).join(' · ');
+		const description = [ data.detail, data.mac ? [ data.mac, data.context ].filter(Boolean).join(' · ') : null, data.gatewayAddresses?.join(' / ') ].filter(Boolean).join(' · ');
 		const label = [ data.name, description ].filter(Boolean).join(' · ');
 		attr(node.button, 'aria-label', expandable
 			? (selected ? _('Collapse %s') : _('Expand %s')).format(label)
@@ -221,13 +207,16 @@ return baseclass.extend({
 				continue;
 			const box = entry.header.getBoundingClientRect();
 			attr(entry.item, 'style', '--topology-access-center:' + box.height / 2 + 'px');
-			centers.push(box.top + box.height / 2 - panel.top);
+			const bounds = this.clients.getBoundingClientRect();
+			if (box.bottom >= bounds.top && box.top <= bounds.bottom)
+				centers.push(Math.max(bounds.top, Math.min(bounds.bottom, box.top + box.height / 2)) - panel.top);
 		}
 		attr(this.endpoints, 'style', '--topology-branch-start:' + Math.min(...centers) + 'px;--topology-branch-height:' + (Math.max(...centers) - Math.min(...centers)) + 'px');
 	},
 
 	overviewGroups(model, selectedId) {
-		return model.groups.filter(group => group.id !== 'interfaces:unassigned' || group.id === selectedId);
+		return model.groups.filter(group => group.id !== 'interfaces:unassigned' || group.id === selectedId)
+			.sort((a, b) => Number(b.active === true) - Number(a.active === true));
 	},
 
 	overviewAccess(group) {
@@ -236,11 +225,8 @@ return baseclass.extend({
 
 	accessPreview(group, access) {
 		const key = group.id + '|' + access.id;
-		const expanded = this.accessStates.has(key) ? this.accessStates.get(key) : access.members.length <= CLIENT_PREVIEW;
-		const members = expanded ? access.members.slice(0, CLIENT_PREVIEW) : [];
-		const selected = expanded && access.members.find(member => member.mac === this.selection.client && member.network === this.selection.network);
-		if (selected && !members.includes(selected))
-			members[members.length - 1] = selected;
+		const expanded = this.accessStates.has(key) ? this.accessStates.get(key) : access.members.length <= COLLAPSE_THRESHOLD;
+		const members = expanded ? access.members : [];
 		return { expanded, members };
 	},
 
@@ -261,12 +247,11 @@ return baseclass.extend({
 					this.updateTree();
 				}
 			}, toggle);
-			const link = E('button', { type: 'button', 'class': 'dashboard-topology-access-link', 'data-dashboard-tab': 'internet' }, [
+			const link = E(access.kind === 'wireless' ? 'button' : 'div', { type: access.kind === 'wireless' ? 'button' : null, 'class': 'dashboard-topology-access-link' }, [
 				icon, E('span', { 'class': 'dashboard-topology-access-label' }, [ name, detail ])
 			]);
 			const header = E('div', { 'class': 'dashboard-topology-access-header' }, [ link, toggleButton ]);
-			const more = E('button', { type: 'button', 'class': 'dashboard-topology-more', 'data-dashboard-tab': 'internet', 'data-dashboard-section': 'devices' });
-			entry = { icon, name, detail, toggle, toggleButton, link, children, header, more, item: E('li', { 'class': 'dashboard-topology-access' }, [ header, children, more ]) };
+			entry = { icon, name, detail, toggle, toggleButton, link, children, header, item: E('li', { 'class': 'dashboard-topology-access' }, [ header, children ]) };
 			this.accessNodes.set(key, entry);
 		}
 		const { expanded, members } = this.accessPreview(group, access);
@@ -274,17 +259,17 @@ return baseclass.extend({
 		attr(entry.toggleButton, 'aria-expanded', String(expanded));
 		attr(entry.toggleButton, 'aria-label', (expanded ? _('Collapse %s') : _('Expand %s')).format(access.name));
 		entry.toggleButton.hidden = !access.members.length;
-		attr(entry.link, 'data-dashboard-tab', access.kind === 'wireless' ? 'wifi' : 'internet');
-		attr(entry.link, 'data-dashboard-section', access.kind === 'wireless' ? 'networks' : 'interfaces');
+		attr(entry.link, 'data-dashboard-tab', access.kind === 'wireless' ? 'wifi' : null);
+		attr(entry.link, 'data-dashboard-section', access.kind === 'wireless' ? 'networks' : null);
 		attr(entry.link, 'data-dashboard-network', access.kind === 'wireless' ? access.network : group.network);
 		attr(entry.link, 'data-dashboard-access', access.id);
 		attr(entry.link, 'data-dashboard-interface', access.device);
-		attr(entry.link, 'aria-label', _('%s: go to details').format(access.name));
+		attr(entry.link, 'aria-label', access.kind === 'wireless' ? _('%s: go to details').format(access.name) : access.name);
 		attr(entry.item, 'data-relation', access.kind === 'unknown' ? 'unknown' : 'logical');
 		attr(entry.item, 'data-access-key', key);
 		attr(entry.header, 'data-active', access.active === false ? 'false' : null);
 		text(entry.name, access.kind === 'unknown' ? _('Other devices') : access.name);
-		text(entry.detail, String(access.members.length));
+		text(entry.detail, access.known === false ? '?' : access.members.length || access.kind === 'wireless' ? String(access.members.length) : '');
 		attr(entry.link, 'title', access.detail);
 		reconcile(entry.children, members.map(member => {
 			const nodeKey = 'member:' + member.id;
@@ -295,36 +280,9 @@ return baseclass.extend({
 			return cached.item;
 		}));
 		entry.children.hidden = !expanded || !members.length;
-		entry.more.hidden = !expanded || access.members.length <= CLIENT_PREVIEW;
-		attr(entry.more, 'data-dashboard-tab', access.kind === 'wireless' ? 'wifi' : 'internet');
-		attr(entry.more, 'data-dashboard-section', access.kind === 'wireless' ? 'clients' : 'devices');
-		attr(entry.more, 'data-dashboard-network', access.kind === 'wireless' ? access.network : group.network);
-		attr(entry.more, 'data-dashboard-topology-group', group.id);
-		attr(entry.more, 'data-dashboard-access', access.id);
-		text(entry.more, _('View all %d devices').format(access.members.length));
+		attr(entry.children, 'tabindex', access.members.length > COLLAPSE_THRESHOLD ? '0' : null);
+		attr(entry.children, 'aria-label', access.name);
 		return entry.item;
-	},
-
-	updateUnplaced(live) {
-		const devices = this.model.unplaced;
-		this.unplaced.hidden = !devices.length;
-		if (devices.length && !this.unplacedInitialized) {
-			this.unplaced.open = !this.model.groups.some(group => group.members.length);
-			this.unplacedInitialized = true;
-		}
-		text(this.unplacedTitle, _('Attachment not identified (%d)').format(devices.length));
-		const page = this.unplacedPage = Math.max(0, Math.min(this.unplacedPage, Math.ceil(devices.length / PAGE_SIZE) - 1));
-		reconcile(this.unplacedList, devices.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE).map(device => {
-			const key = 'unplaced:' + device.id;
-			const button = this.getNode(key, device, live, device.mac === this.selection.client && this.selection.network == null);
-			const cached = this.nodes.get(key);
-			cached.item ||= E('li', {}, button);
-			return cached.item;
-		}));
-		this.unplacedPager.hidden = devices.length <= PAGE_SIZE;
-		this.unplacedPrevious.disabled = page === 0;
-		this.unplacedNext.disabled = (page + 1) * PAGE_SIZE >= devices.length;
-		text(this.unplacedRange, devices.length ? _('%d–%d of %d').format(page * PAGE_SIZE + 1, Math.min((page + 1) * PAGE_SIZE, devices.length), devices.length) : '');
 	},
 
 	updateTopology(snapshot) {
@@ -343,7 +301,7 @@ return baseclass.extend({
 					this.selection.network = group.members[index].network;
 				}
 			}
-			else if (!this.model.unplaced.some(member => member.mac === this.selection.client) || this.selection.network != null) {
+			else {
 				this.selection = {};
 			}
 		}
@@ -374,39 +332,18 @@ return baseclass.extend({
 		attr(this.node, 'data-has-groups', candidates.length ? 'true' : null);
 		attr(this.node, 'data-no-upstreams', !model.upstreams.length ? 'true' : null);
 
-		const available = new Map(candidates.map(item => [ item.id, item ]));
-		const ids = (this.visibleGroupIds || candidates.slice().sort((a, b) => Number(!!b.members.length) - Number(!!a.members.length)).map(item => item.id)).filter(id => available.has(id)).slice(0, 4);
-		if (group && !ids.includes(group.id)) {
-			if (ids.length === 4)
-				ids.pop();
-			ids.push(group.id);
-		}
-		for (const item of candidates)
-			if (ids.length < 4 && !ids.includes(item.id))
-				ids.push(item.id);
-		this.visibleGroupIds = ids;
-		const shownGroups = ids.map(id => available.get(id));
-		this.allNetworks.hidden = candidates.length <= 4;
-		text(this.allNetworks, _('All networks (%d)').format(model.groups.length));
 
-		reconcile(this.groups, shownGroups.map(item => {
+		reconcile(this.groups, candidates.map(item => {
 			const key = 'group:' + item.id;
 			const expandable = item.members.length > 0 || !!item.access?.length;
-			const button = this.getNode(key, Object.assign({}, item, { tab: expandable ? null : 'internet' }), live, item === group && !this.collapsed, expandable);
+			const button = this.getNode(key, Object.assign({}, item, { tab: expandable ? null : item.tab }), live, item === group && !this.collapsed, expandable);
 			const cached = this.nodes.get(key);
 			cached.item ||= E('li', {}, button);
 			attr(cached.item, 'data-has-links', item === group && !this.collapsed && item.access?.length ? 'true' : null);
 			return cached.item;
 		}));
 		const access = !this.collapsed ? this.overviewAccess(group) : [];
-		const shownAccess = access.slice(0, ACCESS_LIMIT);
-		const selected = access.find(item => item.id === this.selection.access || item.members.some(member => member.mac === this.selection.client && member.network === this.selection.network));
-		if (selected && !shownAccess.includes(selected))
-			shownAccess[ACCESS_LIMIT - 1] = selected;
-		reconcile(this.clients, shownAccess.map(item => this.accessNode(group, item, live)));
-		this.allInterfaces.hidden = !group || group.access?.length <= shownAccess.length;
-		attr(this.allInterfaces, 'data-dashboard-network', group?.network);
-		text(this.allInterfaces, _('All interfaces (%d)').format(group?.access?.length || 0));
+		reconcile(this.clients, access.map(item => this.accessNode(group, item, live)));
 		attr(this.endpoints, 'data-has-links', access.length ? 'true' : null);
 		this.groups.hidden = !candidates.length;
 		this.endpoints.hidden = !group || this.collapsed;
@@ -428,8 +365,6 @@ return baseclass.extend({
 			notices.push(_('Some attachment data is unavailable.'));
 		text(this.notice, notices.join(' '));
 		this.notice.hidden = !notices.length;
-		this.updateUnplaced(live);
-		connections.update(model, this.topologyEnabled !== false);
 		for (const [key, entry] of this.accessNodes)
 			if (entry.item.parentNode !== this.clients) {
 				entry.item.remove();

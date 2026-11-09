@@ -6,7 +6,6 @@
 'require uci';
 'require view.dashboard.lib.charts as charts';
 'require view.dashboard.lib.system as system';
-'require view.dashboard.lib.connections as connections';
 
 var callGetUnixtime = rpc.declare({
 	object: 'luci',
@@ -18,7 +17,6 @@ return baseclass.extend({
 
 	params: [],
 	topologySource: 'router',
-	dataSources: [ 'connections', 'wifi' ],
 
 	widgets: [
 		{ id: 'internet', slot: 'cards', title: _('Internet'), order: 10 },
@@ -79,14 +77,7 @@ return baseclass.extend({
 	},
 
 	renderInternetTab() {
-		if (!this.internetNode) {
-			this.wanNode = E('div');
-			this.localDetails = E('details', { 'class': 'dashboard-network-details' }, [
-				E('summary', {}, _('Local networks and devices')), connections.render()
-			]);
-			this.internetNode = E('div', {}, [ this.wanNode, this.localDetails ]);
-		}
-		L.dom.content(this.wanNode, [ 4, 6 ].flatMap(family => {
+		this.internetNode = E('div', {}, [ 4, 6 ].flatMap(family => {
 			const networks = this.wanData[family === 4 ? 0 : 1];
 			return networks.length ? networks.map(net => {
 				const data = this.internetData(family === 4 ? [ [ net ], [] ] : [ [], [ net ] ]);
@@ -96,13 +87,9 @@ return baseclass.extend({
 		return this.internetNode;
 	},
 
-	navigate(selection) {
-		if (selection.section || selection.access || selection.client || selection.group) {
-			this.localDetails.open = true;
-			return connections.navigate(selection);
-		}
-		return selection.network ? Array.from(this.wanNode?.querySelectorAll('[data-dashboard-network]') || [])
-			.find(node => node.dataset.dashboardNetwork === selection.network) : null;
+	navigate({ network }) {
+		return network ? Array.from(this.internetNode?.querySelectorAll('[data-dashboard-network]') || [])
+			.find(node => node.dataset.dashboardNetwork === network) : null;
 	},
 
 	renderSystemTab() {

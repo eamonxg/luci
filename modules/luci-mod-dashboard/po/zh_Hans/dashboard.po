@@ -495,46 +495,17 @@ msgstr "%d 个对端"
 msgid "%d wireless associations"
 msgstr "%d 个无线连接"
 
-#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/lib/connections.js
-#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/include/15_network_path_preview.js
-msgid "%d–%d of %d"
-msgstr "%d–%d，共 %d 条"
-
 #: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/include/15_network_path_preview.js
 msgid "%s: go to details"
 msgstr "%s：查看详情"
-
-#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/include/15_network_path_preview.js
-msgid "About this topology"
-msgstr "关于此拓扑"
 
 #: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/lib/topology.js
 msgid "Access point"
 msgstr "无线接入点"
 
-#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/lib/connections.js
-msgid "Address and forwarding records do not prove current connectivity or Internet access."
-msgstr "地址和转发表记录不能证明设备当前在线或能够访问互联网。"
-
 #: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/lib/topology.js
 msgid "Address observed on %s"
 msgstr "地址记录来自 %s"
-
-#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/include/15_network_path_preview.js
-msgid "All interfaces (%d)"
-msgstr "全部接口（%d）"
-
-#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/include/15_network_path_preview.js
-msgid "All networks (%d)"
-msgstr "全部网络（%d）"
-
-#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/lib/connections.js
-msgid "Attachment"
-msgstr "连接接口"
-
-#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/include/15_network_path_preview.js
-msgid "Attachment not identified (%d)"
-msgstr "连接位置未识别（%d）"
 
 #: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/lib/topology.js
 msgid "Attachment unknown"
@@ -548,14 +519,6 @@ msgstr "收起 %s"
 msgid "Data unavailable"
 msgstr "数据不可用"
 
-#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/lib/connections.js
-msgid "Device observations"
-msgstr "设备记录"
-
-#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/lib/connections.js
-msgid "Devices"
-msgstr "设备"
-
 #: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/lib/topology.js
 msgid "Discovered via %s"
 msgstr "通过 %s 发现"
@@ -568,14 +531,6 @@ msgstr "未获取到设备连接记录。"
 msgid "Expand %s"
 msgstr "展开 %s"
 
-#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/lib/connections.js
-msgid "IP addresses"
-msgstr "IP 地址"
-
-#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/lib/connections.js
-msgid "Interface"
-msgstr "接口"
-
 #: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/include/15_network_path_preview.js
 msgid "Interface data unavailable."
 msgstr "接口数据不可用。"
@@ -583,10 +538,6 @@ msgstr "接口数据不可用。"
 #: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/lib/topology.js
 msgid "Interface not identified"
 msgstr "接口未识别"
-
-#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/lib/connections.js
-msgid "Interfaces"
-msgstr "接口"
 
 #: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/include/15_network_path_preview.js
 msgid "Interfaces and devices"
@@ -605,10 +556,6 @@ msgstr "链路状态未知"
 #: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/lib/connections.js
 msgid "Link up"
 msgstr "链路已连接"
-
-#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/lib/connections.js
-msgid "MAC address"
-msgstr "MAC 地址"
 
 #: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/lib/topology.js
 msgid "Mesh peers"
@@ -645,18 +592,9 @@ msgstr "网络拓扑"
 msgid "Networks"
 msgstr "网络"
 
-#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/lib/connections.js
-#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/include/15_network_path_preview.js
-msgid "Next"
-msgstr "下一页"
-
 #: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/lib/topology.js
 msgid "No endpoint attachment reported."
 msgstr "未获取到设备连接记录。"
-
-#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/lib/connections.js
-msgid "No matching records"
-msgstr "没有匹配的记录"
 
 #: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/include/15_network_path_preview.js
 msgid "No upstream routes reported."
@@ -670,14 +608,6 @@ msgstr "暂无无线连接记录。"
 msgid "Not assigned to a configured network"
 msgstr "未分配到已配置的网络"
 
-#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/lib/connections.js
-msgid "Not identified"
-msgstr "未识别"
-
-#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/lib/connections.js
-msgid "Observation"
-msgstr "发现依据"
-
 #: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/include/15_network_path_preview.js
 msgid "Other devices"
 msgstr "其他设备"
@@ -686,22 +616,9 @@ msgstr "其他设备"
 msgid "Peer state unknown"
 msgstr "对端状态未知"
 
-#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/lib/connections.js
-#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/include/15_network_path_preview.js
-msgid "Previous"
-msgstr "上一页"
-
 #: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/lib/topology.js
 msgid "Reported wireless binding"
 msgstr "无线网络关联"
-
-#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/lib/connections.js
-msgid "Search networks, interfaces or devices"
-msgstr "搜索网络、接口或设备"
-
-#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/lib/connections.js
-msgid "Show in topology"
-msgstr "在拓扑中定位"
 
 #: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/include/15_network_path_preview.js
 msgid "Some attachment data is unavailable."
@@ -711,34 +628,14 @@ msgstr "部分连接数据不可用。"
 msgid "Some wireless data is unavailable."
 msgstr "部分无线数据不可用。"
 
-#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/lib/connections.js
-msgid "Status"
-msgstr "状态"
-
-#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/lib/connections.js
-msgid "Status / details"
-msgstr "状态 / 详情"
-
 #: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/lib/topology.js
 #: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/include/15_network_path_preview.js
 msgid "This device"
 msgstr "本机"
 
-#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/include/15_network_path_preview.js
-msgid "This view combines network membership, wireless associations and interface discovery. Discovery via an interface does not prove a direct cable connection. Address records do not prove Internet access."
-msgstr "此图综合网络归属、无线连接与接口发现记录。通过接口发现的设备可能经过交换机或其他网络设备；地址记录不能证明设备能够访问互联网。"
-
-#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/lib/connections.js
-msgid "Type"
-msgstr "类型"
-
 #: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/lib/topology.js
 msgid "Unassigned interfaces"
 msgstr "未分配的接口"
-
-#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/lib/connections.js
-msgid "Unknown"
-msgstr "未知"
 
 #: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/include/15_network_path_preview.js
 msgid "Upstream routes"
@@ -768,27 +665,3 @@ msgstr "无线中继上联"
 #: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/lib/topology.js
 msgid "%d devices"
 msgstr "%d 台设备"
-
-#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/lib/connections.js
-msgid "Devices on %s"
-msgstr "%s 的设备"
-
-#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/lib/connections.js
-msgid "Internal switch connection"
-msgstr "交换机内部通道"
-
-#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/lib/connections.js
-msgid "Show all records"
-msgstr "显示全部记录"
-
-#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/lib/connections.js
-msgid "Switch CPU port"
-msgstr "交换机 CPU 端口"
-
-#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/include/15_network_path_preview.js
-msgid "View all %d devices"
-msgstr "查看全部 %d 台设备"
-
-#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/include/10_router.js
-msgid "Local networks and devices"
-msgstr "本地网络与设备"

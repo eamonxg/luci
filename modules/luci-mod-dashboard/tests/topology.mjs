@@ -187,7 +187,6 @@ test('optional wireless charts do not turn failed collection into no clients', (
 		assert.equal(wifi[method]().body,'Wireless association data unavailable.');
 });
 
-
 test('topology supplies existing destinations even when saved tabs omit them', async () => {
 	const stored = { cards: [], charts: ['network_path_preview'], tabs: ['resources', 'connections', 'resources'] };
 	const widgets = module('lib/widgets.js', {
@@ -239,14 +238,12 @@ test('upstreams use Internet and unplaced records do not link to unrelated detai
 	}));
 	assert.equal(model.upstreams[0].tab, 'internet');
 	assert.equal(model.upstreams[0].network, 'wan');
-	assert.equal(model.unplaced[0].tab, 'internet');
+	assert.equal(model.unplaced[0].tab, undefined);
 });
 
 test('Internet details include every WAN while the KPI retains the lowest metric route', () => {
 	const router = module('include/10_router.js', {
-		rpc: { declare: () => {} }, E: (tag, attributes, children) => ({ tag, attributes, children }),
-		connections: { render: () => ({ inventory: true }), navigate: selection => ({ section: selection.section }) },
-		L: { dom: { content: (node, children) => { node.children = children; } } }
+		rpc: { declare: () => {} }, E: (tag, attributes, children) => ({ tag, attributes, children })
 	});
 	const net = (name, metric) => ({
 		getName: () => name, getMetric: () => metric, getUptime: () => 0,
@@ -257,18 +254,12 @@ test('Internet details include every WAN while the KPI retains the lowest metric
 	router.params = { internet: router.internetData(router.wanData) };
 	router.renderInternetColumn = (group, name) => ({ name, gateway: group.gatewayv4?.value });
 	const content = router.renderInternetTab();
-	assert.deepEqual(content.children[0].children.slice(0, 2), [{ name: 'wan', gateway: 'wan-gateway' }, { name: 'lte', gateway: 'lte-gateway' }]);
+	assert.deepEqual(content.children.slice(0, 2), [{ name: 'wan', gateway: 'wan-gateway' }, { name: 'lte', gateway: 'lte-gateway' }]);
 	assert.equal(router.params.internet.v4.gatewayv4.value, 'wan-gateway');
 	const destinations = [{ dataset: { dashboardNetwork: 'wan' } }, { dataset: { dashboardNetwork: 'lte' } }];
-	const detail = router.localDetails;
-	assert.equal(router.renderInternetTab(), content);
-	assert.equal(router.localDetails, detail);
-	assert.deepEqual(router.navigate({ section:'interfaces',access:'device:eth0' }), { section:'interfaces' });
-	assert.equal(detail.open, true);
-	router.wanNode = { querySelectorAll: () => destinations };
+	router.internetNode = { querySelectorAll: () => destinations };
 	assert.equal(router.navigate({ network: 'lte' }), destinations[1]);
 });
-
 
 test('Settings displays the same enabled detail tabs as topology navigation', async () => {
 	const uci = { get: (config, section, slot) => ({ charts: ['network_path_preview'], tabs: ['resources'] })[slot] };
@@ -291,14 +282,12 @@ test('Settings displays the same enabled detail tabs as topology navigation', as
 	assert.deepEqual(options.charts.cfgvalue(), ['network_path_preview']);
 });
 
-
 test('topology clients open their existing Wireless association details without requiring a lease', () => {
 	const model = topology.buildModel(snapshot([radio('ap0'), radio('ap1')], [station('ap0', 1), station('ap1', 1)]));
 	assert.deepEqual(model.groups[0].members.map(member => [member.tab, member.network, member.mac]), [
 		['wifi', 'ap0', station('ap0', 1).mac], ['wifi', 'ap1', station('ap1', 1).mac]
 	]);
 });
-
 
 test('the original DHCP tab remains available when lease data exists without service feature flags', async () => {
 	for (const available of [true, false]) {
@@ -333,7 +322,7 @@ test('a wired appliance exposes every member interface and learned endpoint with
 	assert.equal(group.members.length, 3);
 	assert.equal(model.unplaced.length, 0);
 	assert.equal(group.members[0].context, 'Discovered via eth0');
-	assert.equal(group.members[0].tab, 'internet', 'a learned address opens local device details in the existing Internet tab');
+	assert.equal(group.members[0].tab, undefined, 'wired endpoints do not lead to invented detail screens');
 	assert.match(group.access[0].detail, /1 Gbit\/s/);
 	assert(!JSON.stringify(group).includes('online'), 'learning an address is not a reachability probe');
 });
@@ -343,7 +332,7 @@ test('missing attachment RPC keeps ports visible and known devices accessible wi
 	assert.equal(model.groups[0].access.length, 3);
 	assert.equal(model.groups[0].members.length, 0);
 	assert.equal(model.unplaced.length, 3);
-	assert(model.unplaced.every(host => host.relation === 'unknown' && host.tab === 'internet'));
+	assert(model.unplaced.every(host => host.relation === 'unknown' && host.tab == null));
 	assert.equal(model.attachmentsAvailable, false);
 });
 
@@ -478,49 +467,7 @@ test('the collector local-address inventory excludes the router itself from ever
 	assert(!model.groups.flatMap(group => group.members).concat(model.unplaced).some(host => host.mac === station('', 1).mac.toUpperCase()));
 });
 
-test('Network details retain unplaced records and complete IPv6 addresses without assigning a fabricated network', () => {
-	const details = module('lib/connections.js', { E: (tag, attrs, children) => ({ tag, attrs, children }) });
-	details.render = () => { details.sections ||= { networks: {}, interfaces: {}, devices: {} }; };
-	details.draw = () => {};
-	const data = wiredSnapshot({ observations: null });
-	data.connections.hosts[0].addresses = ['192.0.2.2', 'fd00::2'];
-	details.update(topology.buildModel(data));
-	assert.equal(details.sections.devices.records.length, 3);
-	assert.equal(details.sections.devices.records[0].values[1], '192.0.2.2, fd00::2');
-	assert.equal(details.sections.devices.records[0].values[3], 'Not identified');
-	assert.equal(details.sections.interfaces.records.length, 3);
-	assert.equal(details.sections.networks.records.length, 1);
-});
 
-test('Network details paginate and navigate to a device beyond the current page, scoped by network', () => {
-	const details = module('lib/connections.js', {
-		E: (tag, attrs) => ({ tag, attrs }),
-		charts: { table: options => ({ parentNode: details.sections.devices.body,
-			querySelectorAll: () => options.rowKeys.map(key => ({ dataset: { rowKey: key } })) }) }
-	});
-	details.render = () => {};
-	details.search = { value: '' };
-	const section = { page: 0, head: [], body: {}, pager: {}, previous: {}, next: {}, range: {},
-		records: Array.from({ length: 73 }, (_, i) => ({ key: 'host-' + i, client: '02:00:00:00:00:01', network: 'lan' + i, search: 'host-' + i, values: ['host-' + i] })) };
-	details.sections = { devices: section };
-	details.drawSection(section);
-	assert.equal(section.table.querySelectorAll().length, 25);
-	assert.equal(section.range.textContent, '1–25 of 73');
-	assert.equal(section.previous.disabled, true);
-	assert.equal(section.next.disabled, false);
-	details.search.value = 'unrelated search';
-	const target = details.navigate({ client: '02:00:00:00:00:01', network: 'lan70' });
-	assert.equal(details.search.value, '');
-	assert.equal(section.page, 2);
-	assert.equal(target.dataset.rowKey, 'host-70');
-	assert.equal(section.range.textContent, '51–73 of 73');
-	assert.equal(section.next.disabled, true);
-	details.search.value = 'host-70';
-	details.draw();
-	assert.equal(section.page, 0);
-	assert.equal(section.table.querySelectorAll().length, 1);
-	assert.equal(section.pager.hidden, true);
-});
 
 test('DSA CPU conduits are identified from reported parent relationships, without hiding independent Ethernet ports', () => {
 	const collector = module('lib/topology.js');
@@ -529,17 +476,16 @@ test('DSA CPU conduits are identified from reported parent relationships, withou
 	const data = collector.collectConnections([[], null, [dev('eth0', 'ethernet'), dev('lan1', 'dsa', 'eth0'), dev('eth9', 'ethernet')], null]);
 	const model = topology.buildModel({ connections: data });
 	assert.equal(data.devices.find(item => item.id === 'lan1').parent, 'eth0');
-	assert.deepEqual(model.infrastructure.map(item => item.id), ['eth0']);
 	assert(!model.groups.flatMap(group => group.access).some(access => access.device === 'eth0'));
 	assert(model.groups.flatMap(group => group.access).some(access => access.device === 'eth9'));
 });
 
-test('the overview keeps configured networks and leaves unassigned interfaces in details', () => {
+test('the overview keeps configured networks without promoting unassigned interfaces to networks', () => {
 	const widget = module('include/15_network_path_preview.js');
 	const model = topology.buildModel(snapshot([], [], { connections: { interfaces: [lan,
 		{ id: 'docker', device: 'docker0', type: 'bridge', protocol: 'none', up: false }],
 		devices: [{ id: 'eth9', type: 'ethernet', carrier: true }], hosts: [] } }));
-	assert.deepEqual(widget.overviewGroups(model).map(group => group.id), ['net:docker','net:lan']);
+	assert.deepEqual(widget.overviewGroups(model).map(group => group.id), ['net:lan','net:docker']);
 	assert(model.groups.some(group => group.id === 'net:docker'));
 	assert(model.groups.some(group => group.id === 'interfaces:unassigned'));
 	assert(widget.overviewGroups(model, 'net:docker').some(group => group.id === 'net:docker'));
@@ -550,7 +496,7 @@ test('the overview keeps configured networks and leaves unassigned interfaces in
 	assert(widget.overviewAccess(group).some(access => access.id === 'off'));
 });
 
-test('large client groups default to a summary and expand to three clients, with late selections still visible', () => {
+test('large client groups default to a summary and retain every client when expanded', () => {
 	const widget = module('include/15_network_path_preview.js');
 	widget.accessStates = new Map();
 	widget.selection = {};
@@ -561,30 +507,13 @@ test('large client groups default to a summary and expand to three clients, with
 	assert.equal(widget.accessPreview(group, access).expanded, false);
 	assert.equal(widget.accessPreview(group, access).members.length, 0);
 	widget.accessStates.set(group.id + '|' + access.id, true);
-	assert.equal(widget.accessPreview(group, access).members.length, 3);
+	assert.equal(widget.accessPreview(group, access).members.length, 100);
 	widget.selection = { network: 'ap0', client: station('ap0', 99).mac.toUpperCase() };
 	assert(widget.accessPreview(group, access).members.some(member => member.mac === widget.selection.client));
-	assert.equal(widget.accessPreview(group, access).members.length, 3);
+	assert.equal(widget.accessPreview(group, access).members.length, 100);
 	assert.equal(widget.accessPreview(group, group.access.find(item => item.id === 'wifi:ap1')).members.length, 1);
 });
 
-test('View all scopes the full device list to one attachment, preserving all clients through polling', () => {
-	const details = module('lib/connections.js', { E: (tag, attrs) => ({ tag, attrs }) });
-	details.render = () => { details.sections ||= { networks: {}, interfaces: {}, devices: {} }; };
-	details.draw = () => {};
-	const data = snapshot([radio('ap0'),radio('ap1')], [
-		...Array.from({ length: 50 }, (_, i) => station('ap0', i + 1)), station('ap1', 100)
-	]);
-	details.update(topology.buildModel(data));
-	details.scope = { group: 'net:lan', access: 'wifi:ap0', network: 'lan' };
-	let records = details.sections.devices.records.filter(record => details.matchesScope(record));
-	assert.equal(records.length, 50);
-	assert(records.every(record => record.network === 'ap0'));
-	details.update(topology.buildModel(data));
-	assert.equal(details.sections.devices.records.filter(record => details.matchesScope(record)).length, 50);
-	details.scope = null;
-	assert.equal(details.sections.devices.records.filter(record => details.matchesScope(record)).length, 51);
-});
 
 test('topology adds no tab and configured inactive networks remain visible', () => {
 	const widget = module('include/15_network_path_preview.js');
@@ -593,20 +522,13 @@ test('topology adds no tab and configured inactive networks remain visible', () 
 	const model = topology.buildModel(snapshot([], [], { connections: { interfaces: [lan,
 		{ id:'docker',device:'docker0',type:'bridge',protocol:'none',up:false },
 		{ id:'guest',device:'br-guest',type:'bridge',protocol:'static',up:false }], hosts: [] } }));
-	assert.deepEqual(widget.overviewGroups(model).map(group => group.name), ['docker','guest','lan']);
+	assert.deepEqual(widget.overviewGroups(model).map(group => group.name), ['lan','docker','guest']);
 });
 
-test('existing Internet details keep their data sources when the topology chart is disabled', async () => {
-	const source = readFileSync(new URL('index.js', directory), 'utf8');
-	const load = new Function(source.slice(source.indexOf('function invokeIncludesLoad'), source.indexOf('function collectSections')) + '\nreturn invokeIncludesLoad;')();
-	const router = module('include/10_router.js', { rpc: { declare: () => {} } });
-	const graph = module('include/15_network_path_preview.js');
-	const calls = [];
-	router.load = async () => { calls.push('router'); };
-	graph.load = async () => { calls.push('connections'); };
-	const wifi = { widgets: [{ id:'wifi',slot:'tabs' }], topologySource:'wifi', load:async () => { calls.push('wifi'); } };
-	await load([router,graph,wifi], { cards:[],charts:[],tabs:['internet'] });
-	assert.deepEqual(calls.sort(), ['connections','router','wifi']);
-	assert.equal(graph.topologyEnabled, false);
-	assert.equal(graph.skipped, false);
+
+test('missing attachment data does not become a zero-device claim', () => {
+	const model = topology.buildModel(wiredSnapshot({ observations: null }));
+	assert.equal(model.groups[0].detail, 'Link up');
+	const failed = topology.buildModel(snapshot([radio('ap0', ['lan'], { clientsKnown:false })], []));
+	assert.equal(failed.groups[0].detail, 'Data unavailable');
 });

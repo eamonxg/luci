@@ -235,7 +235,7 @@ return baseclass.extend({
 		};
 		const linkRadio = (group, radio) => {
 			accessFor(group, 'wifi:' + radio.id, {
-				name: radio.name, network: radio.id, icon: 'wireless', kind: 'wireless', active: radio.active,
+				name: radio.name, network: radio.id, icon: 'wireless', kind: 'wireless', active: radio.active, known: radio.known,
 				detail: [ modeLabel(radio.mode), radio.band, radio.known ? null : _('Data unavailable') ].filter(Boolean).join(' · ')
 			});
 			if (!group.wifiNetworks.includes(radio.id)) {
@@ -358,7 +358,7 @@ return baseclass.extend({
 				return;
 			group.members.push({
 				id: group.id + '|' + host.mac, mac: host.mac, name: host.name, icon: clientIcon(host.name),
-				network: group.network, access, addresses: host.addresses.slice(), relation, tab: 'internet',
+				network: group.network, access, addresses: host.addresses.slice(), relation,
 				detail: host.addresses[0]?.replace(/\/\d+$/, '') || host.mac, context: evidence
 			});
 			observedMACs.add(host.mac);
@@ -415,13 +415,15 @@ return baseclass.extend({
 			if (count && group.errors.length)
 				group.summary += ' · ' + _('Some wireless data is unavailable.');
 			const ports = group.access?.filter(access => access.kind === 'port' || access.kind === 'virtual') || [];
-			if (ports.length || group.members.some(member => member.tab === 'internet')) {
+			if (ports.length || group.members.some(member => member.access?.startsWith('device:') || member.access === 'unlocated')) {
 				const devices = new Set(group.members.map(member => member.mac)).size;
 				group.detail = [ group.context, ports.length ? _('%d interfaces').format(ports.length) : null, devices ? _('%d discovered devices').format(devices) : null ].filter(Boolean).join(' · ');
 				group.summary = count ? _('%d discovered devices').format(count) : _('No endpoint attachment reported.');
 			}
 			if (group.kind === 'logical')
-				group.detail = group.active === false ? _('Link down') : _('%d devices').format(new Set(group.members.map(member => member.mac)).size);
+				group.detail = count ? _('%d discovered devices').format(new Set(group.members.map(member => member.mac)).size)
+					: group.errors.length ? _('Data unavailable') : group.active === true ? _('Link up')
+						: group.active === false ? _('Link down') : _('Link state unknown');
 		}
 
 		const unplaced = new Map();
@@ -432,12 +434,11 @@ return baseclass.extend({
 				continue;
 			unplaced.set(mac, {
 				id: mac, mac, name: name && name !== '?' ? name : mac, detail: ips[0]?.replace(/\/\d+$/, '') || _('Attachment unknown'),
-				icon: clientIcon(item.name), relation: 'unknown', context: _('Attachment unknown'), addresses: ips, tab: 'internet'
+				icon: clientIcon(item.name), relation: 'unknown', context: _('Attachment unknown'), addresses: ips
 			});
 		}
 
 		return {
-			infrastructure: Array.from(devices.values()).filter(device => conduits.has(device.id) && !assigned.has(device.id)),
 			router: { id: 'router', name: text(router.hostname) || text(router.model) || _('This device'), detail: text(router.managementAddress) || text(router.model), icon: radios.size ? 'router' : 'gateway', tab: 'system' },
 			upstreams: Array.from(upstreams.values()).sort(byId),
 			groups: Array.from(groups.values()).filter(group => !(
