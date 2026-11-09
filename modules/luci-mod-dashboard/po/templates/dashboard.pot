@@ -733,3 +733,27 @@ msgstr ""
 #: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/lib/topology.js
 msgid "Wireless uplink"
 msgstr ""
+
+#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/lib/topology.js
+msgid "%d devices"
+msgstr ""
+
+#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/lib/connections.js
+msgid "Devices on %s"
+msgstr ""
+
+#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/lib/connections.js
+msgid "Internal switch connection"
+msgstr ""
+
+#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/lib/connections.js
+msgid "Show all records"
+msgstr ""
+
+#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/lib/connections.js
+msgid "Switch CPU port"
+msgstr ""
+
+#: modules/luci-mod-dashboard/htdocs/luci-static/resources/view/dashboard/include/15_network_path_preview.js
+msgid "View all %d devices"
+msgstr ""

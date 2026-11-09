@@ -156,6 +156,12 @@
 .dashboard-connections > section { margin-top: 24px; }
 .dashboard-connections-table { overflow-x: auto; }
 .dashboard-connections .dashboard-topology-pager { margin-top: 12px; }
+.dashboard-connections-scope { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 12px; }
+.Dashboard .dashboard-topology-more { margin: 4px 0 4px 26px; padding: 4px 8px; border: 0; background: transparent; box-shadow: none; color: var(--dashboard-primary); font: inherit; font-size: 12px; cursor: pointer; }
+.dashboard-topology-more:hover { text-decoration: underline; }
+.dashboard-topology-more:focus-visible { outline: 2px solid var(--dashboard-primary); outline-offset: 2px; }
+.Dashboard .dashboard-topology-endpoints > button[data-dashboard-section="interfaces"] { display: block; margin: 8px 0 0; padding: 4px 0; border: 0; background: transparent; box-shadow: none; color: var(--dashboard-text-muted); font-size: 12px; }
+.Dashboard .dashboard-topology-endpoints > button[data-dashboard-section="interfaces"]:hover { color: var(--dashboard-primary); text-decoration: underline; }
 .dashboard-topology > button[data-dashboard-section="networks"] { display: block; margin: 0 0 12px auto; }
 
 @media (max-width: 900px) {

@@ -135,16 +135,16 @@ test('wireless collection distinguishes a rejected RPC from a successful empty l
 	assert.deepEqual(failed.assoclist,[]);
 });
 
-test('selection follows a reported VLAN reassignment and clamps to the selected association page', () => {
+test('selection follows a reported VLAN reassignment and keeps its association identity', () => {
 	const widget = module('include/15_network_path_preview.js', { charts:{}, topology, document:{activeElement:null} });
 	widget.init = () => {};
 	widget.updateTree = () => {};
-	widget.pages = new Map([['net:lan', 1]]);
+	widget.accessStates = new Map();
 	widget.activeGroup = 'net:lan';
 	widget.selection = { tab:'wifi', network:'ap0', client:'02:00:00:00:00:06' };
 	widget.updateTopology(snapshot([radio('ap0')], [station('ap0', 6, {interfaces:['guest']})], {connections:{interfaces:[lan,{id:'guest',device:'br-lan.20',up:true}],hosts:[]}}));
 	assert.equal(widget.activeGroup,'net:guest');
-	assert.equal(widget.pages.get('net:guest'),0);
+	assert.equal(widget.selection.network,'ap0');
 	widget.updateTopology(snapshot([radio('ap0')], []));
 	assert.deepEqual(widget.selection,{});
 });
@@ -207,12 +207,11 @@ test('topology supplies existing destinations even when saved tabs omit them', a
 	assert.deepEqual(widgets.resolveLayout(wiredOnly, { cards: [], charts: ['network_path_preview'], tabs: [] }).tabs, ['internet', 'system', 'connections']);
 });
 
-test('group clicks toggle children without selecting a detail destination; reveal reopens the right page', () => {
+test('group clicks toggle children without selecting a detail destination; reveal opens the selected client', () => {
 	const widget = module('include/15_network_path_preview.js', { topology, document: { activeElement: null } });
 	widget.init = () => {};
 	widget.updateTree = () => {};
-	widget.pages = new Map();
-	widget.closedAccess = new Set();
+	widget.accessStates = new Map();
 	widget.selection = {};
 	widget.updateTopology(snapshot([radio('ap0')], Array.from({ length: 9 }, (_, i) => station('ap0', i + 1))));
 	widget.toggleGroup('net:lan');
@@ -225,7 +224,8 @@ test('group clicks toggle children without selecting a detail destination; revea
 	widget.select({ tab: 'wifi', network: 'ap0', client: station('ap0', 9).mac });
 	assert.equal(widget.collapsed, false);
 	assert.equal(widget.activeGroup, 'net:lan');
-	assert.equal(widget.pages.get('net:lan'), 1);
+	assert.equal(widget.accessStates.get('net:lan|wifi:ap0'), true);
+	assert(widget.accessPreview(widget.model.groups[0], widget.model.groups[0].access[0]).members.some(member => member.mac === station('ap0', 9).mac));
 	widget.toggleGroup('net:guest');
 	assert.equal(widget.activeGroup, 'net:lan');
 	assert.equal(widget.collapsed, false);
@@ -513,4 +513,68 @@ test('Network details paginate and navigate to a device beyond the current page,
 	assert.equal(section.page, 0);
 	assert.equal(section.table.querySelectorAll().length, 1);
 	assert.equal(section.pager.hidden, true);
+});
+
+test('DSA CPU conduits are identified from reported parent relationships, without hiding independent Ethernet ports', () => {
+	const collector = module('lib/topology.js');
+	const dev = (id, devtype, parent) => ({ dev: { devtype }, getName: () => id, getMAC: () => null,
+		getType: () => devtype === 'dsa' ? 'switch' : 'ethernet', getParent: () => parent ? { getName: () => parent } : null });
+	const data = collector.collectConnections([[], null, [dev('eth0', 'ethernet'), dev('lan1', 'dsa', 'eth0'), dev('eth9', 'ethernet')], null]);
+	const model = topology.buildModel({ connections: data });
+	assert.equal(data.devices.find(item => item.id === 'lan1').parent, 'eth0');
+	assert.deepEqual(model.infrastructure.map(item => item.id), ['eth0']);
+	assert(!model.groups.flatMap(group => group.access).some(access => access.device === 'eth0'));
+	assert(model.groups.flatMap(group => group.access).some(access => access.device === 'eth9'));
+});
+
+test('the overview omits unused networks and unassigned interfaces while keeping them available in details', () => {
+	const widget = module('include/15_network_path_preview.js');
+	const model = topology.buildModel(snapshot([], [], { connections: { interfaces: [lan,
+		{ id: 'docker', device: 'docker0', type: 'bridge', protocol: 'none', up: false }],
+		devices: [{ id: 'eth9', type: 'ethernet', carrier: true }], hosts: [] } }));
+	assert.deepEqual(widget.overviewGroups(model).map(group => group.id), ['net:lan']);
+	assert(model.groups.some(group => group.id === 'net:docker'));
+	assert(model.groups.some(group => group.id === 'interfaces:unassigned'));
+	assert(widget.overviewGroups(model, 'net:docker').some(group => group.id === 'net:docker'));
+	const group = { access: [{ id: 'off', active: false, members: [] }, { id: 'up', active: true, members: [] }, { id: 'unknown', members: [] }] };
+	widget.selection = {};
+	assert.deepEqual(widget.overviewAccess(group).map(access => access.id), ['up', 'unknown']);
+	widget.selection = { access: 'off' };
+	assert(widget.overviewAccess(group).some(access => access.id === 'off'));
+});
+
+test('large client groups default to a summary and expand to three clients, with late selections still visible', () => {
+	const widget = module('include/15_network_path_preview.js');
+	widget.accessStates = new Map();
+	widget.selection = {};
+	const model = topology.buildModel(snapshot([radio('ap0'),radio('ap1')], [
+		...Array.from({ length: 100 }, (_, i) => station('ap0', i + 1)), station('ap1', 101)
+	]));
+	const group = model.groups[0], access = group.access.find(item => item.id === 'wifi:ap0');
+	assert.equal(widget.accessPreview(group, access).expanded, false);
+	assert.equal(widget.accessPreview(group, access).members.length, 0);
+	widget.accessStates.set(group.id + '|' + access.id, true);
+	assert.equal(widget.accessPreview(group, access).members.length, 3);
+	widget.selection = { network: 'ap0', client: station('ap0', 99).mac.toUpperCase() };
+	assert(widget.accessPreview(group, access).members.some(member => member.mac === widget.selection.client));
+	assert.equal(widget.accessPreview(group, access).members.length, 3);
+	assert.equal(widget.accessPreview(group, group.access.find(item => item.id === 'wifi:ap1')).members.length, 1);
+});
+
+test('View all scopes the full device list to one attachment, preserving all clients through polling', () => {
+	const details = module('lib/connections.js', { E: (tag, attrs) => ({ tag, attrs }) });
+	details.render = () => { details.sections ||= { networks: {}, interfaces: {}, devices: {} }; };
+	details.draw = () => {};
+	const data = snapshot([radio('ap0'),radio('ap1')], [
+		...Array.from({ length: 50 }, (_, i) => station('ap0', i + 1)), station('ap1', 100)
+	]);
+	details.update(topology.buildModel(data));
+	details.scope = { group: 'net:lan', access: 'wifi:ap0', network: 'lan' };
+	let records = details.sections.devices.records.filter(record => details.matchesScope(record));
+	assert.equal(records.length, 50);
+	assert(records.every(record => record.network === 'ap0'));
+	details.update(topology.buildModel(data));
+	assert.equal(details.sections.devices.records.filter(record => details.matchesScope(record)).length, 50);
+	details.scope = null;
+	assert.equal(details.sections.devices.records.filter(record => details.matchesScope(record)).length, 51);
 });
