@@ -43,7 +43,7 @@ return baseclass.extend({
 			type: 'button', 'class': 'cbi-button', 'data-dashboard-topology-show': '',
 			'data-dashboard-network': data.network || null, 'data-dashboard-client': data.mac || null,
 			'data-dashboard-access': data.access || null, 'data-dashboard-topology-group': data.group || null,
-			'data-dashboard-target-tab': data.tab || 'connections'
+			'data-dashboard-target-tab': data.tab || 'internet'
 		}, _('Show in topology'));
 	},
 
