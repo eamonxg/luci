@@ -46,17 +46,16 @@
 	color: inherit; font: inherit; text-transform: none;
 	text-align: center; white-space: normal; cursor: pointer;
 }
-.dashboard-topology-icon { --dashboard-icon-size: 48px; --dashboard-icon-glyph-size: 26px; --dashboard-icon: url('../icons/internet.svg'); display: block; }
-.dashboard-topology-icon[data-icon="router"] { --dashboard-icon: url('../icons/router.svg'); }
-.dashboard-topology-icon[data-icon="gateway"] { --dashboard-icon: url('../icons/gateway.svg'); }
-.dashboard-topology-icon[data-icon="port"] { --dashboard-icon: url('../icons/ethernet.svg'); }
-.dashboard-topology-icon[data-icon="network"] { --dashboard-icon: url('../icons/devices.svg'); }
-.dashboard-topology-icon[data-icon="wireless"] { --dashboard-icon: url('../icons/wireless.svg'); }
-.dashboard-topology-icon[data-icon="phone"] { --dashboard-icon: url('../icons/smartphone.svg'); }
-.dashboard-topology-icon[data-icon="tablet"] { --dashboard-icon: url('../icons/tablet.svg'); }
-.dashboard-topology-icon[data-icon="computer"] { --dashboard-icon: url('../icons/laptop.svg'); }
-.dashboard-topology-icon[data-icon="watch"] { --dashboard-icon: url('../icons/watch.svg'); }
-.dashboard-topology-icon[data-icon="device"] { --dashboard-icon: url('../icons/monitor-smartphone.svg'); }
+.dashboard-topology-icon { --dashboard-icon-size: 48px; --dashboard-icon-glyph-size: 26px; --dashboard-icon: url('../icons/internet.svg?v=lucide-1980e3d59b0f'); display: block; }
+.dashboard-topology-icon[data-icon="router"] { --dashboard-icon: url('../icons/router.svg?v=lucide-1980e3d59b0f'); }
+.dashboard-topology-icon[data-icon="port"] { --dashboard-icon: url('../icons/ethernet.svg?v=lucide-1980e3d59b0f'); }
+.dashboard-topology-icon[data-icon="network"] { --dashboard-icon: url('../icons/devices.svg?v=lucide-1980e3d59b0f'); }
+.dashboard-topology-icon[data-icon="wireless"] { --dashboard-icon: url('../icons/wireless.svg?v=lucide-1980e3d59b0f'); }
+.dashboard-topology-icon[data-icon="phone"] { --dashboard-icon: url('../icons/smartphone.svg?v=lucide-1980e3d59b0f'); }
+.dashboard-topology-icon[data-icon="tablet"] { --dashboard-icon: url('../icons/tablet.svg?v=lucide-1980e3d59b0f'); }
+.dashboard-topology-icon[data-icon="computer"] { --dashboard-icon: url('../icons/laptop.svg?v=lucide-1980e3d59b0f'); }
+.dashboard-topology-icon[data-icon="watch"] { --dashboard-icon: url('../icons/watch.svg?v=lucide-1980e3d59b0f'); }
+.dashboard-topology-icon[data-icon="device"] { --dashboard-icon: url('../icons/monitor-smartphone.svg?v=lucide-1980e3d59b0f'); }
 .dashboard-topology-name {
 	display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
 	max-width: 100%; max-height: 32px; overflow: hidden; overflow-wrap: anywhere;

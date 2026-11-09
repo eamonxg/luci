@@ -1,7 +1,25 @@
-Lucide client icons
+Lucide dashboard icons
 
-Files: smartphone.svg, tablet.svg, laptop.svg, watch.svg, monitor-smartphone.svg
-Source: https://github.com/lucide-icons/lucide/tree/1980e3d59b0fa1a2aeb566d5902b25ee98204001/icons
+All SVG icons in this directory come from this pinned Lucide revision:
+https://github.com/lucide-icons/lucide/tree/1980e3d59b0fa1a2aeb566d5902b25ee98204001/icons
+
+Local filename -> upstream icon:
+  cpu.svg -> cpu.svg
+  devices.svg -> network.svg
+  ethernet.svg -> ethernet-port.svg
+  internet.svg -> globe.svg
+  laptop.svg -> laptop.svg
+  load.svg -> activity.svg
+  memory.svg -> memory-stick.svg
+  monitor-smartphone.svg -> monitor-smartphone.svg
+  not-internet.svg -> globe.svg
+  router.svg -> router.svg
+  smartphone.svg -> smartphone.svg
+  tablet.svg -> tablet.svg
+  temperature.svg -> thermometer.svg
+  watch.svg -> watch.svg
+  wireless.svg -> wifi.svg
+
 Changes: formatting compacted; stroke set to #000 and width 1.6 for the
 dashboard CSS masks; redundant width/height attributes removed.
 Original 24x24 viewBox and icon geometry are preserved.

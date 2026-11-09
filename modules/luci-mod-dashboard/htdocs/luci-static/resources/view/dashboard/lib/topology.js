@@ -439,7 +439,7 @@ return baseclass.extend({
 		}
 
 		return {
-			router: { id: 'router', name: text(router.hostname) || text(router.model) || _('This device'), detail: text(router.managementAddress) || text(router.model), icon: radios.size ? 'router' : 'gateway', tab: 'system' },
+			router: { id: 'router', name: text(router.hostname) || text(router.model) || _('This device'), detail: text(router.managementAddress) || text(router.model), icon: 'router', tab: 'system' },
 			upstreams: Array.from(upstreams.values()).sort(byId),
 			groups: Array.from(groups.values()).filter(group => !(
 				Array.from(upstreams.values()).some(up => up.names.includes(group.network)) &&
