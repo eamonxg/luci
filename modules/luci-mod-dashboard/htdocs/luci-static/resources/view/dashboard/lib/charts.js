@@ -75,7 +75,7 @@ return baseclass.extend({
 	icon(name, className) {
 		return E('span', {
 			'class': 'dashboard-icon ' + (className || ''),
-			'style': '--dashboard-icon: url(%s)'.format(L.resource('view/dashboard/icons/' + name + '.svg'))
+			'style': '--dashboard-icon: url(%s)'.format(L.resource('view/dashboard/icons/' + name + '.svg') + '?v=lucide-1980e3d59b0f')
 		});
 	},
 

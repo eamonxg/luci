@@ -29,6 +29,7 @@ test('APs on the same logical LAN share a group while association identity stays
 	assert.equal(model.groups[0].members.length, 2);
 	assert.notEqual(model.groups[0].members[0].id, model.groups[0].members[1].id);
 	assert.deepEqual(model.groups[0].wifiNetworks, ['ap0', 'ap1']);
+	assert.equal(model.router.icon, 'router');
 });
 
 test('dynamic VLAN station bindings override the parent SSID', () => {
@@ -315,7 +316,7 @@ const wiredSnapshot = (overrides = {}) => snapshot([], [], {
 test('a wired appliance exposes every member interface and learned endpoint without Wi-Fi', () => {
 	const model = topology.buildModel(wiredSnapshot());
 	const group = model.groups[0];
-	assert.equal(model.router.icon, 'gateway');
+	assert.equal(model.router.icon, 'router');
 	assert.equal(model.wifiSupported, false);
 	assert.deepEqual(group.access.map(item => item.name), ['eth0', 'eth2', 'eth3']);
 	assert.deepEqual(group.access.map(item => item.members.length), [1, 1, 1]);
