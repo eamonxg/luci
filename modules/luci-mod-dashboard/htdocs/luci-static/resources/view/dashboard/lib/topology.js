@@ -205,9 +205,11 @@ return baseclass.extend({
 					up.states.push(item.up === true);
 				}
 			up.name = up.names.join(' / ') || up.id.slice(7);
-			const state = up.states.every(Boolean) ? _('Link up') : up.states.some(Boolean) ? _('Mixed link state') : _('Link down');
+			const allUp = up.states.every(Boolean), anyUp = up.states.some(Boolean);
+			const state = allUp ? _('Link up') : anyUp ? _('Mixed link state') : _('Link down');
 			up.detail = up.families.sort().map(family => 'IPv' + family).join(' / ') + ' · ' + state;
-			up.active = up.states.some(Boolean);
+			up.active = anyUp;
+			up.status = allUp ? 'up' : anyUp ? 'warn' : 'down';
 		}
 
 		const wirelessGroup = radio => {
@@ -236,6 +238,7 @@ return baseclass.extend({
 		const linkRadio = (group, radio) => {
 			accessFor(group, 'wifi:' + radio.id, {
 				name: radio.name, network: radio.id, icon: 'wireless', kind: 'wireless', active: radio.active, known: radio.known,
+				meta: [ !radio.ap ? modeLabel(radio.mode) : null, radio.band ].filter(Boolean).join(' · ') || null,
 				detail: [ modeLabel(radio.mode), radio.band, radio.known ? null : _('Data unavailable') ].filter(Boolean).join(' · ')
 			});
 			if (!group.wifiNetworks.includes(radio.id)) {
@@ -273,12 +276,14 @@ return baseclass.extend({
 			observedMACs.add(mac);
 			const ips = addresses(item.addresses), name = text(item.name);
 			const associated = radio.mode === 'mesh' ? item.associated === true : item.associated !== false;
+			const displayTitle = name && name !== '?' ? name : mac;
+			const primaryIp = ips[0]?.replace(/\/\d+$/, '');
 			group.members.push({
-				id, name: name && name !== '?' ? name : mac, icon: radio.ap ? clientIcon(name) : 'router',
+				id, name: displayTitle, icon: radio.ap ? clientIcon(name) : 'router',
 				tab: 'wifi', network: radio.id, mac, relation: associated ? 'observed' : 'unknown',
 				access: 'wifi:' + radio.id, addresses: ips,
-				detail: associated ? [ ips[0]?.replace(/\/\d+$/, '') || mac, radio.band ].filter(Boolean).join(' · ') : _('Peer state unknown'),
-				context: [ radio.name, modeLabel(radio.mode), associated ? '' : _('Peer state unknown') ].filter(Boolean).join(' · ')
+				detail: associated ? (primaryIp || (displayTitle.toUpperCase() !== mac ? mac : '')) : _('Peer state unknown'),
+				context: [ radio.name, radio.band, modeLabel(radio.mode), associated ? '' : _('Peer state unknown') ].filter(Boolean).join(' · ')
 			});
 		}
 
@@ -300,12 +305,13 @@ return baseclass.extend({
 					continue;
 				const kind = [ 'tunnel', 'wireguard', 'vlan', 'vrf', 'alias' ].includes(device.type || item.type) ? 'virtual' : 'port';
 				const speed = Number(device.speed);
+				const speedText = speed > 0 ? (speed >= 1000 ? speed / 1000 + ' Gbit/s' : speed + ' Mbit/s') : null;
 				accessFor(group, 'device:' + name, {
-					name, device: name, kind, icon: kind === 'port' ? 'port' : 'network',
+					name, meta: speedText, device: name, kind, icon: kind === 'port' ? 'port' : 'network',
 					active: device.carrier === null || device.carrier === undefined ? null : device.carrier,
 					detail: [ kind === 'virtual' ? (item.protocol || _('Virtual interface')) : _('Network interface'),
 						device.carrier === true ? _('Link up') : device.carrier === false ? _('Link down') : _('Link state unknown'),
-						speed > 0 ? (speed >= 1000 ? speed / 1000 + ' Gbit/s' : speed + ' Mbit/s') : null ].filter(Boolean).join(' · ')
+						speedText ].filter(Boolean).join(' · ')
 				});
 			}
 		}
@@ -356,10 +362,11 @@ return baseclass.extend({
 		const attach = (group, host, access, relation, evidence) => {
 			if (!host || group.members.some(member => member.mac === host.mac))
 				return;
+			const primaryIp = host.addresses[0]?.replace(/\/\d+$/, '');
 			group.members.push({
 				id: group.id + '|' + host.mac, mac: host.mac, name: host.name, icon: clientIcon(host.name),
 				network: group.network, access, addresses: host.addresses.slice(), relation,
-				detail: host.addresses[0]?.replace(/\/\d+$/, '') || host.mac, context: evidence
+				detail: primaryIp || (host.name.toUpperCase() !== host.mac ? host.mac : ''), context: evidence
 			});
 			observedMACs.add(host.mac);
 		};
@@ -417,13 +424,16 @@ return baseclass.extend({
 			const ports = group.access?.filter(access => access.kind === 'port' || access.kind === 'virtual') || [];
 			if (ports.length || group.members.some(member => member.access?.startsWith('device:') || member.access === 'unlocated')) {
 				const devices = new Set(group.members.map(member => member.mac)).size;
-				group.detail = [ group.context, ports.length ? _('%d interfaces').format(ports.length) : null, devices ? _('%d discovered devices').format(devices) : null ].filter(Boolean).join(' · ');
-				group.summary = count ? _('%d discovered devices').format(count) : _('No endpoint attachment reported.');
+				group.detail = [ group.context, ports.length ? _('%d interfaces').format(ports.length) : null, devices ? _('%d devices').format(devices) : null ].filter(Boolean).join(' · ');
+				group.summary = count ? _('%d devices').format(count) : _('No endpoint attachment reported.');
 			}
-			if (group.kind === 'logical')
-				group.detail = count ? _('%d discovered devices').format(new Set(group.members.map(member => member.mac)).size)
+			if (group.kind === 'logical') {
+				group.detail = count ? _('%d devices').format(new Set(group.members.map(member => member.mac)).size)
 					: group.errors.length ? _('Data unavailable') : group.active === true ? _('Link up')
 						: group.active === false ? _('Link down') : _('Link state unknown');
+				if (!count && !group.errors.length && typeof(group.active) === 'boolean')
+					group.status = group.active ? 'up' : 'down';
+			}
 		}
 
 		const unplaced = new Map();

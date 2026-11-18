@@ -3,7 +3,12 @@
 'require view.dashboard.lib.charts as charts';
 'require view.dashboard.lib.topology as topology';
 
-const COLLAPSE_THRESHOLD = 3;
+const COLLAPSE_THRESHOLD = 5;
+
+function cleanHostname(name, isClient) {
+	const value = String(name ?? '');
+	return isClient ? value.replace(/\.lan$/i, '') : value;
+}
 
 function text(node, value) {
 	value = String(value ?? '');
@@ -60,8 +65,8 @@ return baseclass.extend({
 		this.selection = {};
 		this.upstreams = E('div', { 'class': 'dashboard-topology-upstreams' });
 		this.router = E('div', { 'class': 'dashboard-topology-router' });
-		this.groups = E('ul', { 'class': 'dashboard-topology-groups' });
-		this.clients = E('ul', { 'class': 'dashboard-topology-clients' });
+		this.groups = E('ul', { 'class': 'dashboard-topology-groups', 'role': 'list' });
+		this.clients = E('ul', { 'class': 'dashboard-topology-clients', 'role': 'list' });
 		this.empty = E('p', { 'class': 'dashboard-topology-empty' });
 		this.endpoints = E('div', { 'class': 'dashboard-topology-endpoints', id: 'dashboard-topology-endpoints' }, [ this.clients, this.empty ]);
 		this.tree = E('div', { 'class': 'dashboard-topology-tree' }, [ this.upstreams, this.router, this.groups, this.endpoints ]);
@@ -80,7 +85,7 @@ return baseclass.extend({
 			title: _('Network topology'), className: 'dashboard-topology',
 			body: [
 				E('div', { 'class': 'dashboard-topology-columns', 'aria-hidden': 'true' }, [
-					E('span', {}, _('Upstream routes')), E('span', {}, _('This device')),
+					E('span', {}, _('Internet')), E('span', {}, _('This device')),
 					E('span', {}, _('Networks')), E('span', {}, _('Interfaces and devices'))
 				]),
 				this.tree,
@@ -112,6 +117,8 @@ return baseclass.extend({
 	},
 
 	findGroup(selection) {
+		if (!selection)
+			return null;
 		if (selection.group)
 			return this.model?.groups.find(group => group.id === selection.group);
 		if (selection.client) {
@@ -119,9 +126,11 @@ return baseclass.extend({
 				(selection.network == null || member.network === selection.network) && member.mac === selection.client)) || [];
 			return candidates.length === 1 ? candidates[0] : null;
 		}
+		if (!selection.tab && !selection.network)
+			return null;
 		return this.model?.groups.find(group => selection.tab === 'internet' ? group.network === selection.network : selection.tab === 'wifi'
 				? group.wifiNetworks.includes(selection.network)
-				: group.tab === selection.tab && group.network === selection.network);
+				: selection.tab != null && group.tab === selection.tab && group.network === selection.network);
 	},
 
 	select(selection) {
@@ -142,7 +151,7 @@ return baseclass.extend({
 		if (group && selection.client) {
 			const member = group.members.find(member => member.mac === selection.client && member.network === selection.network);
 			const button = member && this.nodes?.get('member:' + member.id)?.button;
-			const list = button?.closest('.dashboard-topology-access-devices');
+			const list = button?.closest('.dashboard-topology-clients');
 			if (list) {
 				const box = button.getBoundingClientRect(), viewport = list.getBoundingClientRect();
 				if (box.top < viewport.top || box.bottom > viewport.bottom)
@@ -151,7 +160,7 @@ return baseclass.extend({
 		}
 	},
 
-	getNode(key, data, live, selected = false, expandable = false) {
+	getNode(key, data, live, selected = false, expandable = false, expanded = selected) {
 		live.add(key);
 		let node = this.nodes.get(key);
 		const interactive = expandable || !!data.tab;
@@ -173,22 +182,24 @@ return baseclass.extend({
 		attr(node.icon, 'data-icon', data.icon);
 		attr(node.button, 'data-dashboard-tab', expandable ? null : data.tab);
 		attr(node.button, 'data-dashboard-group', expandable ? data.id : null);
-		attr(node.button, 'aria-expanded', expandable ? String(selected) : null);
+		attr(node.button, 'aria-expanded', expandable ? String(expanded) : null);
 		attr(node.button, 'aria-controls', expandable ? this.endpoints.id : null);
 		attr(node.button, 'data-dashboard-network', data.network);
 		attr(node.button, 'data-dashboard-client', data.mac);
 		attr(node.button, 'data-dashboard-access', data.access);
 		attr(node.button, 'data-dashboard-section', !expandable ? (data.tab === 'wifi' ? (data.mac ? 'clients' : 'networks') : null) : null);
 		attr(node.button, 'data-active', data.active === false || data.relation === 'unknown' ? 'false' : null);
+		attr(node.button, 'data-status', data.status || null);
 		attr(node.button, 'aria-current', selected ? 'true' : null);
+		const shownName = cleanHostname(data.name, !!data.mac);
 		const description = [ data.detail, data.mac ? [ data.mac, data.context ].filter(Boolean).join(' · ') : null, data.gatewayAddresses?.join(' / ') ].filter(Boolean).join(' · ');
-		const label = [ data.name, description ].filter(Boolean).join(' · ');
-		attr(node.button, 'aria-label', expandable
-			? (selected ? _('Collapse %s') : _('Expand %s')).format(label)
-			: data.tab ? _('%s: go to details').format(label) : null);
+		const label = [ shownName, description ].filter(Boolean).join(' · ');
+		attr(node.button, 'aria-label', expandable ? label : data.tab ? _('%s: go to details').format(label) : null);
 		attr(node.name, 'title', data.name);
+		attr(node.name, 'data-mac', data.mac && /^(?:[0-9A-F]{2}:){5}[0-9A-F]{2}$/i.test(shownName) ? 'true' : null);
 		attr(node.detail, 'title', description);
-		text(node.name, data.name);
+		node.detail.hidden = !data.detail;
+		text(node.name, shownName);
 		text(node.detail, data.detail);
 		return node.button;
 	},
@@ -201,16 +212,19 @@ return baseclass.extend({
 			return;
 		const panel = this.endpoints.getBoundingClientRect();
 		const origin = icon.getBoundingClientRect();
+		const bounds = this.clients.getBoundingClientRect();
 		const centers = [ origin.top + origin.height / 2 - panel.top ];
+		const updates = [];
 		for (const entry of this.accessNodes.values()) {
 			if (entry.item.parentNode !== this.clients || entry.item.hidden)
 				continue;
 			const box = entry.header.getBoundingClientRect();
-			attr(entry.item, 'style', '--topology-access-center:' + box.height / 2 + 'px');
-			const bounds = this.clients.getBoundingClientRect();
+			updates.push([ entry.item, box.height / 2 ]);
 			if (box.bottom >= bounds.top && box.top <= bounds.bottom)
 				centers.push(Math.max(bounds.top, Math.min(bounds.bottom, box.top + box.height / 2)) - panel.top);
 		}
+		for (const [ item, center ] of updates)
+			attr(item, 'style', '--topology-access-center:' + center + 'px');
 		attr(this.endpoints, 'style', '--topology-branch-start:' + Math.min(...centers) + 'px;--topology-branch-height:' + (Math.max(...centers) - Math.min(...centers)) + 'px');
 	},
 
@@ -220,7 +234,16 @@ return baseclass.extend({
 	},
 
 	overviewAccess(group) {
-		return (group?.access || []).filter(access => access.members.length || access.active !== false || access.id === this.selection?.access);
+		const rank = access => {
+			if (access.kind === 'unknown')
+				return 0;
+			if (access.members.length > 0)
+				return access.active === false ? 3 : 4;
+			return access.active === true ? 2 : access.active == null ? 1 : 0;
+		};
+		return (group?.access || [])
+			.filter(access => access.members.length || access.active !== false || access.id === this.selection?.access)
+			.sort((a, b) => rank(b) - rank(a));
 	},
 
 	accessPreview(group, access) {
@@ -236,41 +259,60 @@ return baseclass.extend({
 		if (!entry) {
 			const icon = E('span', { 'class': 'dashboard-topology-icon', 'aria-hidden': 'true' });
 			const name = E('strong');
-			const detail = E('span', { 'class': 'dashboard-topology-access-detail' });
-			const toggle = E('span', { 'class': 'dashboard-topology-toggle', 'aria-hidden': 'true' });
-			const children = E('ul', { id: 'dashboard-topology-access-' + (this.sequence = (this.sequence || 0) + 1), 'class': 'dashboard-topology-access-devices' });
+			const meta = E('span', { 'class': 'dashboard-topology-access-meta' });
+			const count = E('span', { 'class': 'dashboard-topology-access-count' });
+			const chevron = E('span', { 'class': 'dashboard-topology-chevron', 'aria-hidden': 'true' });
+			const badge = E('span', { 'class': 'dashboard-topology-access-badge' });
+			const children = E('ul', { id: 'dashboard-topology-access-' + (this.sequence = (this.sequence || 0) + 1), 'class': 'dashboard-topology-access-devices', 'role': 'list' });
+			const toggleAccess = () => {
+				this.accessStates.set(key, entry.toggleButton.getAttribute('aria-expanded') !== 'true');
+				this.updateTree();
+			};
 			const toggleButton = E('button', {
 				type: 'button', 'class': 'dashboard-topology-access-toggle',
 				'aria-controls': children.id,
-				click: () => {
-					this.accessStates.set(key, entry.toggleButton.getAttribute('aria-expanded') !== 'true');
-					this.updateTree();
+				click: toggleAccess
+			}, [ count, chevron ]);
+			const link = E(access.kind === 'wireless' ? 'button' : 'div', {
+				type: access.kind === 'wireless' ? 'button' : null,
+				'class': 'dashboard-topology-access-link',
+				click: access.kind === 'wireless' ? null : () => {
+					if (!entry.toggleButton.hidden)
+						toggleAccess();
 				}
-			}, toggle);
-			const link = E(access.kind === 'wireless' ? 'button' : 'div', { type: access.kind === 'wireless' ? 'button' : null, 'class': 'dashboard-topology-access-link' }, [
-				icon, E('span', { 'class': 'dashboard-topology-access-label' }, [ name, detail ])
-			]);
-			const header = E('div', { 'class': 'dashboard-topology-access-header' }, [ link, toggleButton ]);
-			entry = { icon, name, detail, toggle, toggleButton, link, children, header, item: E('li', { 'class': 'dashboard-topology-access' }, [ header, children ]) };
+			}, [ icon, E('span', { 'class': 'dashboard-topology-access-label' }, [ name, meta ]) ]);
+			const header = E('div', { 'class': 'dashboard-topology-access-header' }, [ link, toggleButton, badge ]);
+			entry = { icon, name, meta, count, badge, toggleButton, link, children, header, item: E('li', { 'class': 'dashboard-topology-access' }, [ header, children ]) };
 			this.accessNodes.set(key, entry);
 		}
 		const { expanded, members } = this.accessPreview(group, access);
+		const displayTitle = access.kind === 'unknown' ? _('Other devices') : access.name;
+		const accessLabel = [ displayTitle, access.meta ].filter(Boolean).join(' · ');
+		const hasMembers = access.members.length > 0;
+		const badgeText = access.known === false ? '?' : !hasMembers && access.kind === 'wireless' ? '0' : '';
 		attr(entry.icon, 'data-icon', access.icon);
 		attr(entry.toggleButton, 'aria-expanded', String(expanded));
-		attr(entry.toggleButton, 'aria-label', (expanded ? _('Collapse %s') : _('Expand %s')).format(access.name));
-		entry.toggleButton.hidden = !access.members.length;
+		attr(entry.toggleButton, 'aria-label', accessLabel + ' (' + access.members.length + ')');
+		entry.toggleButton.hidden = !hasMembers;
+		text(entry.count, hasMembers ? String(access.members.length) : '');
+		text(entry.badge, badgeText);
+		entry.badge.hidden = !badgeText;
+		attr(entry.badge, 'data-zero', badgeText === '0' ? 'true' : null);
 		attr(entry.link, 'data-dashboard-tab', access.kind === 'wireless' ? 'wifi' : null);
 		attr(entry.link, 'data-dashboard-section', access.kind === 'wireless' ? 'networks' : null);
 		attr(entry.link, 'data-dashboard-network', access.kind === 'wireless' ? access.network : group.network);
 		attr(entry.link, 'data-dashboard-access', access.id);
 		attr(entry.link, 'data-dashboard-interface', access.device);
-		attr(entry.link, 'aria-label', access.kind === 'wireless' ? _('%s: go to details').format(access.name) : access.name);
+		attr(entry.link, 'data-collapsible', access.kind !== 'wireless' && hasMembers ? 'true' : null);
+		attr(entry.link, 'aria-label', access.kind === 'wireless' ? _('%s: go to details').format(accessLabel) : null);
 		attr(entry.item, 'data-relation', access.kind === 'unknown' ? 'unknown' : 'logical');
+		attr(entry.item, 'data-empty', !hasMembers && access.known !== false ? 'true' : null);
 		attr(entry.item, 'data-access-key', key);
 		attr(entry.header, 'data-active', access.active === false ? 'false' : null);
-		text(entry.name, access.kind === 'unknown' ? _('Other devices') : access.name);
-		text(entry.detail, access.known === false ? '?' : access.members.length || access.kind === 'wireless' ? String(access.members.length) : '');
-		attr(entry.link, 'title', access.detail);
+		text(entry.name, displayTitle);
+		text(entry.meta, access.meta || '');
+		entry.meta.hidden = !access.meta;
+		attr(entry.name, 'title', access.detail || accessLabel);
 		reconcile(entry.children, members.map(member => {
 			const nodeKey = 'member:' + member.id;
 			const button = this.getNode(nodeKey, member, live, member.mac === this.selection.client && member.network === this.selection.network);
@@ -280,8 +322,6 @@ return baseclass.extend({
 			return cached.item;
 		}));
 		entry.children.hidden = !expanded || !members.length;
-		attr(entry.children, 'tabindex', access.members.length > COLLAPSE_THRESHOLD ? '0' : null);
-		attr(entry.children, 'aria-label', access.name);
 		return entry.item;
 	},
 
@@ -333,13 +373,17 @@ return baseclass.extend({
 		attr(this.node, 'data-no-upstreams', !model.upstreams.length ? 'true' : null);
 
 
+		const singleFixedGroup = candidates.length === 1 && !this.mobile.matches && !this.collapsed;
 		reconcile(this.groups, candidates.map(item => {
 			const key = 'group:' + item.id;
-			const expandable = item.members.length > 0 || !!item.access?.length;
-			const button = this.getNode(key, Object.assign({}, item, { tab: expandable ? null : item.tab }), live, item === group && !this.collapsed, expandable);
+			const hasChildren = item.members.length > 0 || !!item.access?.length;
+			const expandable = hasChildren && !singleFixedGroup;
+			const activeBranch = item === group && !this.collapsed;
+			const highlightCurrent = candidates.length > 1 && activeBranch;
+			const button = this.getNode(key, Object.assign({}, item, { tab: hasChildren ? null : item.tab }), live, highlightCurrent, expandable, activeBranch);
 			const cached = this.nodes.get(key);
 			cached.item ||= E('li', {}, button);
-			attr(cached.item, 'data-has-links', item === group && !this.collapsed && item.access?.length ? 'true' : null);
+			attr(cached.item, 'data-has-links', activeBranch && item.access?.length ? 'true' : null);
 			return cached.item;
 		}));
 		const access = !this.collapsed ? this.overviewAccess(group) : [];

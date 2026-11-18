@@ -533,3 +533,41 @@ test('missing attachment data does not become a zero-device claim', () => {
 	const failed = topology.buildModel(snapshot([radio('ap0', ['lan'], { clientsKnown:false })], []));
 	assert.equal(failed.groups[0].detail, 'Data unavailable');
 });
+
+test('wireless band and port speed stay on parent access rows rather than repeating per client', () => {
+	const data = wiredSnapshot();
+	data.wifiSupported = true;
+	data.wifi = {
+		networks: [radio('ap24', ['lan'], { band: '2.4 GHz' }), radio('ap5', ['lan'], { band: '5 GHz' })],
+		clients: [station('ap5', 9, { name: 'Mac.lan' })]
+	};
+	const group = topology.buildModel(data).groups[0];
+	assert.equal(group.access.find(item => item.id === 'wifi:ap24').meta, '2.4 GHz');
+	assert.equal(group.access.find(item => item.id === 'wifi:ap5').meta, '5 GHz');
+	assert.equal(group.access.find(item => item.id === 'device:eth0').meta, '1 Gbit/s');
+	const wifiClient = group.members.find(member => member.access === 'wifi:ap5');
+	assert.equal(wifiClient.detail, '192.0.2.9');
+	assert(!wifiClient.detail.includes('5 GHz'));
+});
+
+test('empty selection never promotes unassigned interfaces and populated interfaces sort ahead of idle ones', () => {
+	const widget = module('include/15_network_path_preview.js', { topology });
+	const model = topology.buildModel(snapshot(
+		[radio('ap24', ['lan'], { band: '2.4 GHz' }), radio('ap5', ['lan'], { band: '5 GHz' })],
+		[station('ap5', 1)],
+		{
+			connections: {
+				interfaces: [lan],
+				devices: [{ id: 'eth9', type: 'ethernet', carrier: null }],
+				hosts: [station('', 2)],
+				observations: { bridges: [], neighbours: [{ mac: station('', 2).mac, address: '192.0.2.2', device: 'br-lan' }] }
+			}
+		}
+	));
+	widget.model = model;
+	widget.selection = {};
+	assert.equal(widget.findGroup(widget.selection), null);
+	assert.deepEqual(widget.overviewGroups(model, widget.findGroup(widget.selection)?.id).map(group => group.id), ['net:lan']);
+	const lanGroup = model.groups.find(group => group.id === 'net:lan');
+	assert.deepEqual(widget.overviewAccess(lanGroup).map(access => access.id), ['wifi:ap5', 'wifi:ap24', 'unlocated']);
+});
