@@ -156,12 +156,6 @@
 .dashboard-topology-access { border: 0; }
 .dashboard-topology-access[data-empty="true"] > .dashboard-topology-access-header { opacity: .72; }
 .dashboard-topology-access[data-empty="true"] > .dashboard-topology-access-header:focus-within { opacity: 1; }
-.dashboard-topology-tree .dashboard-topology-clients {
-	max-block-size: 420px;
-	overflow-y: auto; overflow-x: clip;
-	scrollbar-width: thin; overscroll-behavior: contain;
-	margin-inline-start: -12px; padding-inline-start: 12px;
-}
 .Dashboard button.dashboard-topology-access-link,
 .Dashboard .dashboard-topology-access-link[data-collapsible="true"] { cursor: pointer; }
 .dashboard-topology-access-header {
@@ -338,10 +332,7 @@ button.dashboard-topology-access-link:focus-visible,
 	}
 
 	.dashboard-topology-groups .dashboard-topology-endpoints { margin: 6px 0 2px; padding-inline-start: 36px; }
-	.dashboard-topology-tree .dashboard-topology-clients {
-		max-block-size: none; overflow: visible;
-		margin-inline-start: 0; padding-inline-start: 0; gap: 10px;
-	}
+	.dashboard-topology-clients { gap: 10px; }
 	.dashboard-topology-groups > li:last-child .dashboard-topology-access::before {
 		content: ''; position: absolute; pointer-events: none;
 		left: -14px; top: 0; bottom: -10px; width: 0;

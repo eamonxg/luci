@@ -70,7 +70,6 @@ return baseclass.extend({
 		this.empty = E('p', { 'class': 'dashboard-topology-empty' });
 		this.endpoints = E('div', { 'class': 'dashboard-topology-endpoints', id: 'dashboard-topology-endpoints' }, [ this.clients, this.empty ]);
 		this.tree = E('div', { 'class': 'dashboard-topology-tree' }, [ this.upstreams, this.router, this.groups, this.endpoints ]);
-		this.clients.addEventListener('scroll', () => this.updateConnectors());
 		this.mobile = window.matchMedia('(max-width: 900px)');
 		this.mobile.addEventListener('change', () => {
 			const focused = document.activeElement;
@@ -147,17 +146,6 @@ return baseclass.extend({
 				this.accessStates.set(group.id + '|' + selection.access, true);
 		}
 		this.updateTree();
-		// Reveal a selected Wi-Fi client inside its bounded branch list.
-		if (group && selection.client) {
-			const member = group.members.find(member => member.mac === selection.client && member.network === selection.network);
-			const button = member && this.nodes?.get('member:' + member.id)?.button;
-			const list = button?.closest('.dashboard-topology-clients');
-			if (list) {
-				const box = button.getBoundingClientRect(), viewport = list.getBoundingClientRect();
-				if (box.top < viewport.top || box.bottom > viewport.bottom)
-					list.scrollTop += box.top - viewport.top - (viewport.height - box.height) / 2;
-			}
-		}
 	},
 
 	getNode(key, data, live, selected = false, expandable = false, expanded = selected) {
@@ -212,7 +200,6 @@ return baseclass.extend({
 			return;
 		const panel = this.endpoints.getBoundingClientRect();
 		const origin = icon.getBoundingClientRect();
-		const bounds = this.clients.getBoundingClientRect();
 		const centers = [ origin.top + origin.height / 2 - panel.top ];
 		const updates = [];
 		for (const entry of this.accessNodes.values()) {
@@ -220,8 +207,7 @@ return baseclass.extend({
 				continue;
 			const box = entry.header.getBoundingClientRect();
 			updates.push([ entry.item, box.height / 2 ]);
-			if (box.bottom >= bounds.top && box.top <= bounds.bottom)
-				centers.push(Math.max(bounds.top, Math.min(bounds.bottom, box.top + box.height / 2)) - panel.top);
+			centers.push(box.top + box.height / 2 - panel.top);
 		}
 		for (const [ item, center ] of updates)
 			attr(item, 'style', '--topology-access-center:' + center + 'px');
